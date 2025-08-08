@@ -341,7 +341,13 @@ class Md5CalculatorPool {
       buffer = new ArrayBuffer(0)
     } else if (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength) {
       // 如果Uint8Array使用了整个buffer，直接使用原buffer
-      buffer = data.buffer
+      // 确保是ArrayBuffer类型，如果是SharedArrayBuffer则复制数据
+      if (data.buffer instanceof ArrayBuffer) {
+        buffer = data.buffer
+      } else {
+        buffer = new ArrayBuffer(data.byteLength)
+        new Uint8Array(buffer).set(data)
+      }
     } else {
       // 如果Uint8Array是buffer的一个子视图，创建新的ArrayBuffer
       buffer = new ArrayBuffer(data.byteLength)
