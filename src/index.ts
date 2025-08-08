@@ -7,7 +7,7 @@ interface WorkerMessage {
   id: string
   type: 'calculate' | 'result' | 'error' | 'init_shared_memory'
   data?: {
-    fileData?: number[]
+    fileData?: ArrayBuffer  // 使用ArrayBuffer替代number[]，避免序列化开销
     md5Length?: number
     result?: string
     error?: string
@@ -15,6 +15,8 @@ interface WorkerMessage {
     dataOffset?: number
     dataLength?: number
   }
+  // 使用Transferable Objects优化大数据传输
+  transferList?: Transferable[]
 }
 
 // 共享内存配置
@@ -170,26 +172,30 @@ class Md5CalculatorPool {
             }
           } as WorkerMessage)
         } else {
-          // 共享内存不足，回退到消息传递
+          // 共享内存不足，回退到零拷贝传输
+          const buffer = task.data.buffer.slice(task.data.byteOffset, task.data.byteOffset + task.data.byteLength)
           worker.postMessage({
             id: task.id,
             type: 'calculate',
             data: {
-              fileData: Array.from(task.data),
+              fileData: buffer,
               md5Length: task.md5Length
-            }
-          } as WorkerMessage)
+            },
+            transferList: [buffer]
+          } as WorkerMessage, [buffer])
         }
       } else {
-        // 使用传统的消息传递
+        // 使用零拷贝传输替代Array.from
+        const buffer = task.data.buffer.slice(task.data.byteOffset, task.data.byteOffset + task.data.byteLength)
         worker.postMessage({
           id: task.id,
           type: 'calculate',
           data: {
-            fileData: Array.from(task.data),
+            fileData: buffer,
             md5Length: task.md5Length
-          }
-        } as WorkerMessage)
+          },
+          transferList: [buffer]
+        } as WorkerMessage, [buffer])
       }
     }
   }
@@ -246,26 +252,30 @@ class Md5CalculatorPool {
               }
             } as WorkerMessage)
           } else {
-            // 共享内存不足，回退到消息传递
+            // 共享内存不足，回退到零拷贝传输
+            const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
             worker.postMessage({
               id: taskId,
               type: 'calculate',
               data: {
-                fileData: Array.from(data),
+                fileData: buffer,
                 md5Length
-              }
-            } as WorkerMessage)
+              },
+              transferList: [buffer]
+            } as WorkerMessage, [buffer])
           }
         } else {
-          // 使用传统的消息传递
+          // 使用零拷贝传输替代Array.from
+          const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
           worker.postMessage({
             id: taskId,
             type: 'calculate',
             data: {
-              fileData: Array.from(data),
+              fileData: buffer,
               md5Length
-            }
-          } as WorkerMessage)
+            },
+            transferList: [buffer]
+          } as WorkerMessage, [buffer])
         }
       } else {
         this.pendingTasks.push(task)

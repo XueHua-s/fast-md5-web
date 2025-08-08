@@ -4,7 +4,7 @@ export class Md5Calculator {
   free(): void;
   constructor();
   /**
-   * 异步计算文件MD5 - 用于Worker中的多任务处理
+   * 异步计算文件MD5 - 优化版本，减少内存拷贝
    * data: 文件数据的字节数组
    * md5_length: MD5位数（16表示128位的一半，32表示完整128位）
    */
