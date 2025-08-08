@@ -4,7 +4,7 @@
 
 ---
 
-🚀 **The fastest MD5 calculation library for web environments** - powered by Rust WebAssembly with **Web Worker** support for truly non-blocking computation. **100x faster** than spark-md5 when processing 1000+ large files.
+🚀 **Possibly the fastest MD5 calculation library for web environments** - powered by Rust WebAssembly with **Web Worker** support for truly non-blocking computation. **100x faster** than spark-md5 in specific scenarios when processing 1000+ large files.
 
 ⚡ **ESM-only package** - Supports modern browsers, Node.js, and Deno with ES modules. **No CommonJS support**.
 

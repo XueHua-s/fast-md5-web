@@ -4,7 +4,7 @@
 
 ---
 
-🚀 **Web 环境下最快的 MD5 计算库** - 基于 Rust WebAssembly，支持 **Web Worker** 实现真正的非阻塞计算。处理 1000+ 大文件时比 spark-md5 **快 100 倍**。
+🚀 **可能是Web 环境下最快的 MD5 计算库** - 基于 Rust WebAssembly，支持 **Web Worker** 实现真正的非阻塞计算。特定场景下处理 1000+ 大文件时比 spark-md5 **快 100 倍**。
 
 ⚡ **纯 ESM 包** - 支持现代浏览器、Node.js 和 Deno 的 ES 模块。**不支持 CommonJS**。
 
