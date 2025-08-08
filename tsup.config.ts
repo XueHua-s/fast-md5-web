@@ -18,6 +18,16 @@ export default defineConfig({
       js: '.js'
     }
   },
+  onSuccess: async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const mtsFile = path.join('dist', 'index.d.mts')
+    const dtsFile = path.join('dist', 'index.d.ts')
+    if (fs.existsSync(mtsFile)) {
+      fs.renameSync(mtsFile, dtsFile)
+      console.log('Renamed index.d.mts to index.d.ts')
+    }
+  },
   esbuildOptions(options) {
     options.banner = {
       js: '"use client"',

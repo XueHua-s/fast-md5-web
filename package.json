@@ -2,6 +2,7 @@
   "name": "@fast-md5/web",
   "version": "1.0.0",
   "description": "A TypeScript project with tsup bundler for Rust WASM MD5 calculation",
+  "type": "module",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "repository": {
