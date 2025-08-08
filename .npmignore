@@ -1,0 +1,18 @@
+# NPM ignore file
+# This file overrides .gitignore for npm publishing
+
+# Ignore everything in wasm except pkg
+wasm/*
+!wasm/pkg/
+!wasm/pkg/**
+
+# Standard ignores
+node_modules/
+*.log
+.DS_Store
+src/
+tsconfig.json
+tsup.config.ts
+eslint.config.mjs
+.prettierrc
+.prettierignore

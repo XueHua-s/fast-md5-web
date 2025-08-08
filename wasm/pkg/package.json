@@ -1,0 +1,18 @@
+{
+  "name": "wasm-md5",
+  "type": "module",
+  "collaborators": [
+    "Snow <lijiaxin@xhblog.top>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "wasm_md5_bg.wasm",
+    "wasm_md5.js",
+    "wasm_md5.d.ts"
+  ],
+  "main": "wasm_md5.js",
+  "types": "wasm_md5.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

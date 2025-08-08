@@ -1,6 +1,6 @@
 {
-  "name": "@fast-md5/web",
-  "version": "1.0.0",
+  "name": "fast-md5-web",
+  "version": "1.0.5",
   "description": "A TypeScript project with tsup bundler for Rust WASM MD5 calculation",
   "type": "module",
   "module": "dist/index.js",
@@ -10,7 +10,7 @@
     "url": "https://github.com/XueHua-s/rust-wasm-calculate-file-md5"
   },
   "scripts": {
-    "build:wasm": "cd wasm && wasm-pack build --target web",
+    "build:wasm": "cd wasm && wasm-pack build --target web && echo # Temporarily disabled to allow npm publish > pkg/.gitignore && echo # * >> pkg/.gitignore",
     "build": "pnpm run build:wasm && tsup",
     "dev": "tsup --watch",
     "clean": "rimraf dist",
@@ -44,7 +44,8 @@
   },
  "files": [
     "dist",
-    "wasm/pkg"
+    "wasm/pkg/**/*",
+    "package.json"
   ],
   "exports": {
     ".": {

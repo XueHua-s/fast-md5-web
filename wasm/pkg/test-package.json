@@ -1,0 +1,28 @@
+{
+  "name": "wasm-md5-test",
+  "version": "1.0.0",
+  "description": "WASM MD5 vs Spark MD5 性能对比测试",
+  "type": "module",
+  "scripts": {
+    "test": "python -m http.server 8000",
+    "test-node": "npx http-server -p 8000 -c-1",
+    "dev": "npx live-server --port=8000 --entry-file=test.html"
+  },
+  "dependencies": {
+    "spark-md5": "^3.0.2"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "live-server": "^1.2.2"
+  },
+  "keywords": [
+    "wasm",
+    "md5",
+    "performance",
+    "rust",
+    "javascript",
+    "benchmark"
+  ],
+  "author": "Snow",
+  "license": "MIT"
+}
