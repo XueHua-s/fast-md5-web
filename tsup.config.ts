@@ -32,5 +32,6 @@ export default defineConfig({
     options.banner = {
       js: '"use client"',
     }
+    options.drop = ['console']
   },
 })

@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid'
 
 // 配置常量
 const DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024 // 8MB 分块大小
-const MAX_CONCURRENT_TASKS = 6 // 最大并发任务数
 const DEFAULT_SHARED_MEMORY_SIZE = 512 * 1024 * 1024 // 512MB 共享内存
 const MEMORY_CLEANUP_THRESHOLD = 0.8 // 内存使用率超过80%时清理
 
@@ -75,7 +74,7 @@ class Md5CalculatorPool {
 
   constructor(poolSize: number = 4, sharedMemoryConfig?: SharedMemoryConfig, maxConcurrentTasks?: number) {
     this.poolSize = poolSize
-    this.maxConcurrentTasks = maxConcurrentTasks || MAX_CONCURRENT_TASKS
+    this.maxConcurrentTasks = maxConcurrentTasks || poolSize
     this.sharedMemoryConfig = sharedMemoryConfig || {
       enabled: false,
       memorySize: DEFAULT_SHARED_MEMORY_SIZE,

@@ -48,24 +48,29 @@ import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'npm:fast-md5-web';
 import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'fast-md5-web';
 
 // 方法 1：使用带 SharedArrayBuffer 的 Worker 池（推荐用于处理多个文件）
-const pool = new Md5CalculatorPool(navigator.hardwareConcurrency, {
-  enabled: true,                    // 启用 SharedArrayBuffer 实现零拷贝传输
-  memorySize: 64 * 1024 * 1024     // 64MB 共享内存
-});
+const pool = new Md5CalculatorPool(
+  navigator.hardwareConcurrency, // 工作线程数
+  {
+    enabled: true,                    // 启用 SharedArrayBuffer 实现零拷贝传输
+    memorySize: 64 * 1024 * 1024,    // 64MB 共享内存
+    chunkSize: 8 * 1024 * 1024       // 8MB 分块大小
+  }
+);
 
 // 并行处理多个文件
 const files = [file1, file2, file3]; // 多个 File 对象
-const results = await Promise.all(
-  files.map(async (file) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const data = new Uint8Array(arrayBuffer);
-    return await pool.calculateMd5(data, 32);
-  })
-);
+const results = await pool.calculateMd5Batch(files, 32);
 console.log('MD5 哈希值:', results);
 
 // 检查池状态，包括共享内存使用情况
-console.log('池状态:', pool.getPoolStatus());
+const status = pool.getPoolStatus();
+console.log('池状态:', {
+  总工作线程: status.totalWorkers,
+  活跃任务: status.activeTasks,
+  共享内存启用: status.sharedMemoryEnabled,
+  内存使用: status.sharedMemoryUsage ? 
+    `${(status.sharedMemoryUsage.used / 1024 / 1024).toFixed(2)}MB / ${(status.sharedMemoryUsage.total / 1024 / 1024).toFixed(2)}MB` : '不可用'
+});
 
 // 清理资源
 pool.destroy();
@@ -117,29 +122,51 @@ console.log('MD5:', hash);
 ```typescript
 interface SharedMemoryConfig {
   enabled: boolean;     // 启用 SharedArrayBuffer 支持
-  memorySize: number;   // 共享内存大小（字节，默认：64MB）
+  memorySize: number;   // 共享内存大小（字节）
+  chunkSize: number;    // 分块大小（字节）
 }
 
 class Md5CalculatorPool {
-  constructor(poolSize?: number, sharedMemoryConfig?: SharedMemoryConfig); // 默认：4 个工作线程
+  constructor(poolSize?: number, sharedMemoryConfig?: SharedMemoryConfig, maxConcurrentTasks?: number);
   
-  async calculateMd5(data: Uint8Array, md5Length?: number): Promise<string>;
+  // 单文件处理
+  async calculateMd5(
+    data: Uint8Array | File, 
+    md5Length?: number, 
+    timeout?: number,
+    onProgress?: (progress: number) => void,
+    priority?: number
+  ): Promise<string>;
+  
+  // 批量处理
+  async calculateMd5Batch(
+    files: (Uint8Array | File)[], 
+    md5Length?: number,
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<string[]>;
+  
   destroy(): void;
   getPoolStatus(): {
-    totalWorkers: number;      // 总工作线程数
-    availableWorkers: number;  // 可用工作线程数
-    pendingTasks: number;      // 待处理任务数
+    totalWorkers: number;         // 总工作线程数
+    availableWorkers: number;     // 可用工作线程数
+    pendingTasks: number;         // 待处理任务数
+    activeTasks: number;          // 活跃任务数
+    maxConcurrentTasks: number;   // 最大并发任务数（默认等于线程数）
     sharedMemoryEnabled: boolean; // 共享内存是否启用
-    sharedMemoryUsage?: {      // 共享内存使用情况
-      total: number;           // 总内存大小
-      used: number;            // 已使用内存
-      available: number;       // 可用内存
+    sharedMemoryUsage?: {         // 共享内存使用情况
+      total: number;              // 总内存大小
+      used: number;               // 已使用内存
+      available: number;          // 可用内存
+      fragmentation: number;      // 内存碎片数量
     };
   };
   
   // 动态共享内存控制
-  enableSharedMemory(memorySize?: number): boolean;
+  enableSharedMemory(memorySize?: number, chunkSize?: number): boolean;
   disableSharedMemory(): void;
+  
+  // 任务管理
+  cancelTask(taskId: string): boolean;
 }
 ```
 

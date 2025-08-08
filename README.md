@@ -54,6 +54,7 @@ import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'fast-md5-web';
 // Method 1: Using Worker Pool with SharedArrayBuffer (Recommended for processing multiple files)
 const pool = new Md5CalculatorPool(
   navigator.hardwareConcurrency, // Worker count
+  undefined, // SharedMemoryConfig (optional)
   3 // Max concurrent tasks
 );
 
@@ -65,26 +66,21 @@ const largeFile = new File([/* large data */], 'large-file.bin');
 const hash = await pool.calculateMd5(
   largeFile,
   32, // MD5 length
-  'high', // Priority
+  60000, // Timeout
   (progress) => {
     console.log(`Progress: ${progress.toFixed(1)}%`);
-  }
+  },
+  1 // Priority (number)
 );
 console.log('MD5:', hash);
 
-// Batch processing with priority
+// Batch processing
 const files = [file1, file2, file3];
 const results = await pool.calculateMd5Batch(
-  files.map(file => ({
-    data: file,
-    priority: file.size > 50 * 1024 * 1024 ? 'high' : 'normal'
-  })),
-  (progress, fileIndex) => {
-    if (fileIndex !== undefined) {
-      console.log(`File ${fileIndex} progress: ${progress.toFixed(1)}%`);
-    } else {
-      console.log(`Overall progress: ${progress.toFixed(1)}%`);
-    }
+  files,
+  32, // MD5 length
+  (completed, total) => {
+    console.log(`Progress: ${completed}/${total} files completed`);
   }
 );
 console.log('Batch results:', results);
@@ -92,10 +88,11 @@ console.log('Batch results:', results);
 // Check pool status including memory usage
 const status = pool.getPoolStatus();
 console.log('Pool status:', {
-  workers: status.workerCount,
+  workers: status.totalWorkers,
   activeTasks: status.activeTasks,
-  memoryUsage: `${(status.memoryUsed / 1024 / 1024).toFixed(2)}MB / ${(status.memoryTotal / 1024 / 1024).toFixed(2)}MB`,
-  fragmentation: `${(status.fragmentation * 100).toFixed(1)}%`
+  memoryEnabled: status.sharedMemoryEnabled,
+  memoryUsage: status.sharedMemoryUsage ? 
+    `${(status.sharedMemoryUsage.used / 1024 / 1024).toFixed(2)}MB / ${(status.sharedMemoryUsage.total / 1024 / 1024).toFixed(2)}MB` : 'N/A'
 });
 
 // Clean up
@@ -146,40 +143,48 @@ console.log('MD5:', hash);
 Manages a pool of Web Workers for parallel MD5 calculation of multiple files with advanced features.
 
 ```typescript
-interface BatchTask {
-  data: File | Uint8Array;
-  priority?: 'low' | 'normal' | 'high';
+interface SharedMemoryConfig {
+  enabled: boolean;
+  memorySize: number;
+  chunkSize: number;
 }
 
 interface PoolStatus {
-  workerCount: number;
-  activeTasks: number;
+  totalWorkers: number;
+  availableWorkers: number;
   pendingTasks: number;
-  memoryUsed: number;
-  memoryTotal: number;
-  fragmentation: number;
+  activeTasks: number;
+  maxConcurrentTasks: number;
   sharedMemoryEnabled: boolean;
+  sharedMemoryUsage?: {
+    total: number;
+    used: number;
+    available: number;
+    fragmentation: number;
+  };
 }
 
 class Md5CalculatorPool {
-  constructor(workerCount?: number, maxConcurrentTasks?: number); // Default: navigator.hardwareConcurrency workers
+  constructor(poolSize?: number, sharedMemoryConfig?: SharedMemoryConfig, maxConcurrentTasks?: number);
   
   // Single file processing with streaming support
   async calculateMd5(
-    data: File | Uint8Array, 
+    data: Uint8Array | File, 
     md5Length?: number, 
-    priority?: 'low' | 'normal' | 'high',
-    progressCallback?: (progress: number) => void
+    timeout?: number,
+    onProgress?: (progress: number) => void,
+    priority?: number
   ): Promise<string>;
   
-  // Batch processing with priority support
+  // Batch processing
   async calculateMd5Batch(
-    tasks: BatchTask[], 
-    progressCallback?: (progress: number, fileIndex?: number) => void
+    files: (Uint8Array | File)[], 
+    md5Length?: number,
+    onProgress?: (completed: number, total: number) => void
   ): Promise<string[]>;
   
   // Shared memory management
-  enableSharedMemory(memorySize: number, chunkSize?: number): void;
+  enableSharedMemory(memorySize?: number, chunkSize?: number): boolean;
   disableSharedMemory(): void;
   
   // Task management
@@ -296,32 +301,35 @@ npm run clean
 pool.enableSharedMemory(128 * 1024 * 1024, 4 * 1024 * 1024); // 128MB, 4MB chunks
 
 // Use high priority for critical files
-const hash = await pool.calculateMd5(largeFile, 32, 'high', (progress) => {
-  console.log(`Processing: ${progress.toFixed(1)}%`);
-});
+const hash = await pool.calculateMd5(
+  largeFile, 
+  32, 
+  60000, // timeout
+  (progress) => {
+    console.log(`Processing: ${progress.toFixed(1)}%`);
+  },
+  10 // high priority (higher number = higher priority)
+);
 ```
 
 #### For Batch Processing
 ```typescript
 // Sort files by size for optimal scheduling
-const sortedTasks = files
-  .sort((a, b) => b.size - a.size)
-  .map(file => ({
-    data: file,
-    priority: file.size > 100 * 1024 * 1024 ? 'high' : 'normal'
-  }));
+const sortedFiles = files.sort((a, b) => b.size - a.size);
 
-const results = await pool.calculateMd5Batch(sortedTasks, (progress, fileIndex) => {
-  if (fileIndex !== undefined) {
-    console.log(`File ${fileIndex}: ${progress.toFixed(1)}%`);
+const results = await pool.calculateMd5Batch(
+  sortedFiles, 
+  32, // MD5 length
+  (completed, total) => {
+    console.log(`Progress: ${completed}/${total} files completed`);
   }
-});
+);
 ```
 
 #### Memory Monitoring
 ```typescript
 const status = pool.getPoolStatus();
-if (status.fragmentation > 0.3) {
+if (status.sharedMemoryUsage && status.sharedMemoryUsage.fragmentation > 3) {
   console.warn('High memory fragmentation detected');
   // Consider recreating the pool
 }
@@ -469,11 +477,13 @@ const pool = new Md5CalculatorPool(4);
 setInterval(() => {
   const status = pool.getPoolStatus();
   console.log('Pool Status:', {
-    workers: status.workerCount,
+    workers: status.totalWorkers,
     active: status.activeTasks,
     pending: status.pendingTasks,
-    memory: `${(status.memoryUsed / 1024 / 1024).toFixed(2)}MB`,
-    fragmentation: `${(status.fragmentation * 100).toFixed(1)}%`
+    memory: status.sharedMemoryUsage ? 
+      `${(status.sharedMemoryUsage.used / 1024 / 1024).toFixed(2)}MB` : 'N/A',
+    fragmentation: status.sharedMemoryUsage ? 
+      `${status.sharedMemoryUsage.fragmentation}` : 'N/A'
   });
 }, 5000);
 ```
