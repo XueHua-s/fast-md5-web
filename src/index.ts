@@ -333,10 +333,21 @@ class Md5CalculatorPool {
     }
 
     // 回退到零拷贝传输
-    const buffer = data.buffer.slice(
-      data.byteOffset,
-      data.byteOffset + data.byteLength
-    )
+    // 对于小文件，创建新的ArrayBuffer以确保数据完整性
+    let buffer: ArrayBuffer
+    
+    if (data.byteLength === 0) {
+      // 处理空文件的情况
+      buffer = new ArrayBuffer(0)
+    } else if (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength) {
+      // 如果Uint8Array使用了整个buffer，直接使用原buffer
+      buffer = data.buffer
+    } else {
+      // 如果Uint8Array是buffer的一个子视图，创建新的ArrayBuffer
+      buffer = new ArrayBuffer(data.byteLength)
+      new Uint8Array(buffer).set(data)
+    }
+    
     worker.postMessage(
       {
         id: task.id,
