@@ -1,12 +1,6 @@
 import WasmInit, { Md5Calculator } from '../wasm/pkg'
 import { v4 as uuidv4 } from 'uuid'
 
-// 包装Md5Calculator的简单方法
-export async function calculateMd5(data: Uint8Array, md5Length: number = 32): Promise<string> {
-  await WasmInit()
-  const calculator = new Md5Calculator()
-  return await calculator.calculate_md5_async(data, md5Length)
-}
 
 // WebWorker消息接口
 interface WorkerMessage {
@@ -21,7 +15,7 @@ interface WorkerMessage {
 }
 
 // WebWorker线程池管理类
-export class Md5CalculatorPool {
+class Md5CalculatorPool {
   private workers: Worker[] = []
   private availableWorkers: Worker[] = []
   private pendingTasks: Array<{
@@ -164,9 +158,8 @@ export class Md5CalculatorPool {
     }
   }
 }
-
-// 导出默认实例
-export const defaultMd5Pool = new Md5CalculatorPool()
-
-// 导出类型
-export type { Md5Calculator }
+export {
+  Md5CalculatorPool,
+  WasmInit,
+  Md5Calculator
+}
