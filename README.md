@@ -20,8 +20,22 @@
 
 ## 📦 Installation
 
+### Node.js / Browser
 ```bash
 npm install fast-md5-web
+```
+
+### Deno
+```typescript
+// Direct import from npm (recommended)
+import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'npm:fast-md5-web';
+
+// Or add to deno.json import map:
+// {
+//   "imports": {
+//     "fast-md5-web": "npm:fast-md5-web"
+//   }
+// }
 ```
 
 > **⚠️ ESM Only**: This package only supports ES modules. It works in modern browsers, Node.js (with `"type": "module"` in package.json), and Deno. CommonJS is not supported.
@@ -31,22 +45,52 @@ npm install fast-md5-web
 ```typescript
 import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'fast-md5-web';
 
-// Method 1: Using Worker Pool (Recommended for large files)
+// Method 1: Using Worker Pool (Recommended for processing multiple files)
 const pool = new Md5CalculatorPool(navigator.hardwareConcurrency); // Auto-detect CPU cores
 
-// Convert file to Uint8Array
-const file = new File(['Hello, World!'], 'example.txt');
-const arrayBuffer = await file.arrayBuffer();
-const data = new Uint8Array(arrayBuffer);
-
-// Calculate MD5
-const md5Hash = await pool.calculateMd5(data, 32); // 32-bit hash
-console.log('MD5:', md5Hash);
+// Process multiple files in parallel
+const files = [file1, file2, file3]; // Multiple File objects
+const results = await Promise.all(
+  files.map(async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const data = new Uint8Array(arrayBuffer);
+    return await pool.calculateMd5(data, 32);
+  })
+);
+console.log('MD5 hashes:', results);
 
 // Clean up
 pool.destroy();
 
-// Method 2: Direct WASM usage (for smaller files)
+// Method 2: Direct WASM usage (Recommended for single large files)
+await WasmInit();
+const calculator = new Md5Calculator();
+
+// Convert single file to Uint8Array
+const file = new File(['Hello, World!'], 'example.txt');
+const arrayBuffer = await file.arrayBuffer();
+const data = new Uint8Array(arrayBuffer);
+
+const hash = await calculator.calculate_md5_async(data, 32);
+console.log('MD5:', hash);
+
+// Method 3: Deno usage
+// For Deno, you can import directly from npm:
+import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'npm:fast-md5-web';
+
+// Or use with import maps in deno.json:
+// {
+//   "imports": {
+//     "fast-md5-web": "npm:fast-md5-web"
+//   }
+// }
+// Then: import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'fast-md5-web';
+
+// Read file in Deno
+const fileData = await Deno.readFile('./example.txt');
+const data = new Uint8Array(fileData);
+
+// Calculate MD5
 await WasmInit();
 const calculator = new Md5Calculator();
 const hash = await calculator.calculate_md5_async(data, 32);
@@ -57,11 +101,11 @@ console.log('MD5:', hash);
 
 ### `Md5CalculatorPool`
 
-Manages a pool of Web Workers for parallel MD5 calculation.
+Manages a pool of Web Workers for parallel MD5 calculation of multiple files.
 
 ```typescript
 class Md5CalculatorPool {
-  constructor(poolSize?: number); // Default: navigator.hardwareConcurrency
+  constructor(poolSize?: number); // Default: 4
   
   async calculateMd5(data: Uint8Array, md5Length?: number): Promise<string>;
   destroy(): void;
@@ -75,7 +119,7 @@ class Md5CalculatorPool {
 
 ### `Md5Calculator`
 
-Direct WASM MD5 calculator.
+Direct WASM MD5 calculator for single file processing.
 
 ```typescript
 class Md5Calculator {
@@ -149,11 +193,11 @@ npm run clean
 
 ### Key Optimizations
 
-- **Web Worker Pool**: True parallel processing prevents main thread blocking
+- **Web Worker Pool**: Parallel processing of multiple files prevents main thread blocking
 - **Rust WebAssembly**: Native performance with zero-cost abstractions
 - **Chunked Processing**: Automatic optimization for files > 1MB
 - **Memory Efficient**: Streaming processing with controlled memory usage
-- **Batch Processing**: Optimized for handling multiple files simultaneously
+- **Multi-file Processing**: Optimized for handling multiple files simultaneously with worker pool
 
 ## 📄 License
 

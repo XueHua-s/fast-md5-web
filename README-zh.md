@@ -20,8 +20,22 @@
 
 ## 📦 安装
 
+### Node.js / 浏览器
 ```bash
 npm install fast-md5-web
+```
+
+### Deno
+```typescript
+// 直接从 npm 导入（推荐）
+import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'npm:fast-md5-web';
+
+// 或者添加到 deno.json 导入映射：
+// {
+//   "imports": {
+//     "fast-md5-web": "npm:fast-md5-web"
+//   }
+// }
 ```
 
 > **⚠️ 仅支持 ESM**: 此包仅支持 ES 模块。适用于现代浏览器、Node.js（需在 package.json 中设置 `"type": "module"`）和 Deno。不支持 CommonJS。
@@ -31,22 +45,52 @@ npm install fast-md5-web
 ```typescript
 import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'fast-md5-web';
 
-// 方法1：使用工作池（推荐用于大文件）
+// 方法1：使用工作池（推荐用于处理多个文件）
 const pool = new Md5CalculatorPool(navigator.hardwareConcurrency); // 自动检测 CPU 核心数
 
-// 将文件转换为 Uint8Array
-const file = new File(['Hello, World!'], 'example.txt');
-const arrayBuffer = await file.arrayBuffer();
-const data = new Uint8Array(arrayBuffer);
-
-// 计算 MD5
-const md5Hash = await pool.calculateMd5(data, 32); // 32位哈希
-console.log('MD5:', md5Hash);
+// 并行处理多个文件
+const files = [file1, file2, file3]; // 多个 File 对象
+const results = await Promise.all(
+  files.map(async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const data = new Uint8Array(arrayBuffer);
+    return await pool.calculateMd5(data, 32);
+  })
+);
+console.log('MD5 哈希值:', results);
 
 // 清理资源
 pool.destroy();
 
-// 方法2：直接使用 WASM（适用于小文件）
+// 方法2：直接使用 WASM（推荐用于单个大文件）
+await WasmInit();
+const calculator = new Md5Calculator();
+
+// 将单个文件转换为 Uint8Array
+const file = new File(['Hello, World!'], 'example.txt');
+const arrayBuffer = await file.arrayBuffer();
+const data = new Uint8Array(arrayBuffer);
+
+const hash = await calculator.calculate_md5_async(data, 32);
+console.log('MD5:', hash);
+
+// 方法3：Deno 使用方式
+// 在 Deno 中，你可以直接从 npm 导入：
+import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'npm:fast-md5-web';
+
+// 或者在 deno.json 中使用导入映射：
+// {
+//   "imports": {
+//     "fast-md5-web": "npm:fast-md5-web"
+//   }
+// }
+// 然后：import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'fast-md5-web';
+
+// 在 Deno 中读取文件
+const fileData = await Deno.readFile('./example.txt');
+const data = new Uint8Array(fileData);
+
+// 计算 MD5
 await WasmInit();
 const calculator = new Md5Calculator();
 const hash = await calculator.calculate_md5_async(data, 32);
@@ -57,11 +101,11 @@ console.log('MD5:', hash);
 
 ### `Md5CalculatorPool`
 
-管理 Web Worker 池进行并行 MD5 计算。
+管理 Web Worker 池进行多文件并行 MD5 计算。
 
 ```typescript
 class Md5CalculatorPool {
-  constructor(poolSize?: number); // 默认：navigator.hardwareConcurrency
+  constructor(poolSize?: number); // 默认：4
   
   async calculateMd5(data: Uint8Array, md5Length?: number): Promise<string>;
   destroy(): void;
@@ -75,7 +119,7 @@ class Md5CalculatorPool {
 
 ### `Md5Calculator`
 
-直接的 WASM MD5 计算器。
+用于单文件处理的直接 WASM MD5 计算器。
 
 ```typescript
 class Md5Calculator {
@@ -149,11 +193,11 @@ npm run clean
 
 ### 关键优化
 
-- **Web Worker 池**：真正的并行处理，防止主线程阻塞
+- **Web Worker 池**：多文件并行处理，防止主线程阻塞
 - **Rust WebAssembly**：零成本抽象的原生性能
 - **分块处理**：对超过 1MB 的文件自动优化
 - **内存高效**：流式处理，控制内存使用
-- **批量处理**：专为同时处理多个文件而优化
+- **多文件处理**：使用工作池专为同时处理多个文件而优化
 
 ## 📄 许可证
 
