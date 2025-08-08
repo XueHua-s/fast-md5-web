@@ -37,7 +37,7 @@ impl Md5Calculator {
     /// data: 文件数据的字节数组
     /// md5_length: MD5位数（16表示128位的一半，32表示完整128位）
     #[wasm_bindgen]
-    pub async fn calculate_md5_async(&self, data: Vec<u8>, md5_length: usize) -> String {
+    pub async fn calculate_md5_async(&self, data: &[u8], md5_length: usize) -> String {
         let data_len = data.len();
         
         if data_len == 0 {

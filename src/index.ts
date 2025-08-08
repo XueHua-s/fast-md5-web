@@ -5,13 +5,22 @@ import { v4 as uuidv4 } from 'uuid'
 // WebWorker消息接口
 interface WorkerMessage {
   id: string
-  type: 'calculate' | 'result' | 'error'
+  type: 'calculate' | 'result' | 'error' | 'init_shared_memory'
   data?: {
     fileData?: number[]
     md5Length?: number
     result?: string
     error?: string
+    sharedMemory?: SharedArrayBuffer
+    dataOffset?: number
+    dataLength?: number
   }
+}
+
+// 共享内存配置
+interface SharedMemoryConfig {
+  enabled: boolean
+  memorySize: number // 共享内存大小（字节）
 }
 
 // WebWorker线程池管理类
@@ -30,10 +39,38 @@ class Md5CalculatorPool {
     reject: (reason: any) => void
   }>()
   private poolSize: number
+  private sharedMemoryConfig: SharedMemoryConfig
+  private sharedMemory: SharedArrayBuffer | null = null
+  private sharedMemoryView: Uint8Array | null = null
+  private memoryOffset: number = 0
 
-  constructor(poolSize: number = 4) {
+  constructor(poolSize: number = 4, sharedMemoryConfig?: SharedMemoryConfig) {
     this.poolSize = poolSize
+    this.sharedMemoryConfig = sharedMemoryConfig || {
+      enabled: false,
+      memorySize: 64 * 1024 * 1024 // 默认64MB
+    }
+    
+    if (this.sharedMemoryConfig.enabled && this.isSharedArrayBufferSupported()) {
+      this.initializeSharedMemory()
+    }
+    
     this.initializeWorkers()
+  }
+
+  private isSharedArrayBufferSupported(): boolean {
+    return typeof SharedArrayBuffer !== 'undefined'
+  }
+
+  private initializeSharedMemory(): void {
+    try {
+      this.sharedMemory = new SharedArrayBuffer(this.sharedMemoryConfig.memorySize)
+      this.sharedMemoryView = new Uint8Array(this.sharedMemory)
+      console.log(`Shared memory initialized: ${this.sharedMemoryConfig.memorySize} bytes`)
+    } catch (error) {
+      console.warn('Failed to initialize shared memory, falling back to message passing:', error)
+      this.sharedMemoryConfig.enabled = false
+    }
   }
 
   private initializeWorkers(): void {
@@ -41,6 +78,17 @@ class Md5CalculatorPool {
       const worker = this.createWorker()
       this.workers.push(worker)
       this.availableWorkers.push(worker)
+      
+      // 如果启用了共享内存，向Worker发送共享内存
+      if (this.sharedMemoryConfig.enabled && this.sharedMemory) {
+        worker.postMessage({
+          id: `init-${i}`,
+          type: 'init_shared_memory',
+          data: {
+            sharedMemory: this.sharedMemory
+          }
+        } as WorkerMessage)
+      }
     }
   }
 
@@ -94,14 +142,43 @@ class Md5CalculatorPool {
         reject: task.reject
       })
       
-      worker.postMessage({
-        id: task.id,
-        type: 'calculate',
-        data: {
-          fileData: Array.from(task.data),
-          md5Length: task.md5Length
+      if (this.sharedMemoryConfig.enabled && this.sharedMemoryView && task.data.length <= this.sharedMemoryConfig.memorySize) {
+        // 使用共享内存
+        const dataOffset = this.allocateSharedMemory(task.data.length)
+        if (dataOffset !== -1) {
+          this.sharedMemoryView.set(task.data, dataOffset)
+          
+          worker.postMessage({
+            id: task.id,
+            type: 'calculate',
+            data: {
+              dataOffset,
+              dataLength: task.data.length,
+              md5Length: task.md5Length
+            }
+          } as WorkerMessage)
+        } else {
+          // 共享内存不足，回退到消息传递
+          worker.postMessage({
+            id: task.id,
+            type: 'calculate',
+            data: {
+              fileData: Array.from(task.data),
+              md5Length: task.md5Length
+            }
+          } as WorkerMessage)
         }
-      } as WorkerMessage)
+      } else {
+        // 使用传统的消息传递
+        worker.postMessage({
+          id: task.id,
+          type: 'calculate',
+          data: {
+            fileData: Array.from(task.data),
+            md5Length: task.md5Length
+          }
+        } as WorkerMessage)
+      }
     }
   }
 
@@ -122,14 +199,43 @@ class Md5CalculatorPool {
         
         this.taskCallbacks.set(taskId, { resolve, reject })
         
-        worker.postMessage({
-          id: taskId,
-          type: 'calculate',
-          data: {
-            fileData: Array.from(data),
-            md5Length
+        if (this.sharedMemoryConfig.enabled && this.sharedMemoryView && data.length <= this.sharedMemoryConfig.memorySize) {
+          // 使用共享内存
+          const dataOffset = this.allocateSharedMemory(data.length)
+          if (dataOffset !== -1) {
+            this.sharedMemoryView.set(data, dataOffset)
+            
+            worker.postMessage({
+              id: taskId,
+              type: 'calculate',
+              data: {
+                dataOffset,
+                dataLength: data.length,
+                md5Length
+              }
+            } as WorkerMessage)
+          } else {
+            // 共享内存不足，回退到消息传递
+            worker.postMessage({
+              id: taskId,
+              type: 'calculate',
+              data: {
+                fileData: Array.from(data),
+                md5Length
+              }
+            } as WorkerMessage)
           }
-        } as WorkerMessage)
+        } else {
+          // 使用传统的消息传递
+          worker.postMessage({
+            id: taskId,
+            type: 'calculate',
+            data: {
+              fileData: Array.from(data),
+              md5Length
+            }
+          } as WorkerMessage)
+        }
       } else {
         this.pendingTasks.push(task)
       }
@@ -146,16 +252,72 @@ class Md5CalculatorPool {
     this.taskCallbacks.clear()
   }
 
+  private allocateSharedMemory(size: number): number {
+    if (!this.sharedMemoryView || this.memoryOffset + size > this.sharedMemoryConfig.memorySize) {
+      return -1 // 内存不足
+    }
+    
+    const offset = this.memoryOffset
+    this.memoryOffset += size
+    return offset
+  }
+
+
+
   public getPoolStatus(): {
     totalWorkers: number
     availableWorkers: number
     pendingTasks: number
+    sharedMemoryEnabled: boolean
+    sharedMemoryUsage?: {
+      total: number
+      used: number
+      available: number
+    }
   } {
-    return {
+    const status: any = {
       totalWorkers: this.workers.length,
       availableWorkers: this.availableWorkers.length,
-      pendingTasks: this.pendingTasks.length
+      pendingTasks: this.pendingTasks.length,
+      sharedMemoryEnabled: this.sharedMemoryConfig.enabled
     }
+    
+    if (this.sharedMemoryConfig.enabled && this.sharedMemory) {
+      status.sharedMemoryUsage = {
+        total: this.sharedMemoryConfig.memorySize,
+        used: this.memoryOffset,
+        available: this.sharedMemoryConfig.memorySize - this.memoryOffset
+      }
+    }
+    
+    return status
+  }
+
+  public enableSharedMemory(memorySize: number = 64 * 1024 * 1024): boolean {
+    if (!this.isSharedArrayBufferSupported()) {
+      console.warn('SharedArrayBuffer is not supported in this environment')
+      return false
+    }
+    
+    this.sharedMemoryConfig = {
+      enabled: true,
+      memorySize
+    }
+    
+    this.initializeSharedMemory()
+    
+    // 重新初始化所有Worker以支持共享内存
+    this.destroy()
+    this.initializeWorkers()
+    
+    return this.sharedMemoryConfig.enabled
+  }
+
+  public disableSharedMemory(): void {
+    this.sharedMemoryConfig.enabled = false
+    this.sharedMemory = null
+    this.sharedMemoryView = null
+    this.memoryOffset = 0
   }
 }
 export {
