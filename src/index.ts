@@ -121,11 +121,23 @@ class Md5CalculatorPool {
     
     worker.onerror = (error) => {
       console.error('Worker error:', error)
+      // 查找并拒绝所有与此worker相关的待处理任务
+      for (const [taskId, callbacks] of this.taskCallbacks.entries()) {
+        callbacks.reject(new Error(`Worker error: ${error.message || 'Unknown worker error'}`))
+        this.taskCallbacks.delete(taskId)
+      }
+      
       // 重新创建worker
       const index = this.workers.indexOf(worker)
       if (index !== -1) {
         this.workers[index] = this.createWorker()
-        this.availableWorkers.push(this.workers[index])
+        // 只有在worker不在可用列表中时才添加
+        const availableIndex = this.availableWorkers.indexOf(worker)
+        if (availableIndex !== -1) {
+          this.availableWorkers[availableIndex] = this.workers[index]
+        } else {
+          this.availableWorkers.push(this.workers[index])
+        }
       }
     }
     
@@ -182,22 +194,41 @@ class Md5CalculatorPool {
     }
   }
 
-  public async calculateMd5(data: Uint8Array, md5Length: number = 32): Promise<string> {
+  public async calculateMd5(data: Uint8Array, md5Length: number = 32, timeout: number = 30000): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const taskId = uuidv4()
+      
+      // 设置超时处理
+      const timeoutId = setTimeout(() => {
+        const callbacks = this.taskCallbacks.get(taskId)
+        if (callbacks) {
+          this.taskCallbacks.delete(taskId)
+          reject(new Error(`MD5 calculation timeout after ${timeout}ms`))
+        }
+      }, timeout)
+      
+      const wrappedResolve = (result: string) => {
+        clearTimeout(timeoutId)
+        resolve(result)
+      }
+      
+      const wrappedReject = (error: any) => {
+        clearTimeout(timeoutId)
+        reject(error)
+      }
       
       const task = {
         id: taskId,
         data,
         md5Length,
-        resolve,
-        reject
+        resolve: wrappedResolve,
+        reject: wrappedReject
       }
       
       if (this.availableWorkers.length > 0) {
         const worker = this.availableWorkers.shift()!
         
-        this.taskCallbacks.set(taskId, { resolve, reject })
+        this.taskCallbacks.set(taskId, { resolve: wrappedResolve, reject: wrappedReject })
         
         if (this.sharedMemoryConfig.enabled && this.sharedMemoryView && data.length <= this.sharedMemoryConfig.memorySize) {
           // 使用共享内存
@@ -254,7 +285,11 @@ class Md5CalculatorPool {
 
   private allocateSharedMemory(size: number): number {
     if (!this.sharedMemoryView || this.memoryOffset + size > this.sharedMemoryConfig.memorySize) {
-      return -1 // 内存不足
+      // 尝试重置内存偏移量，简单的内存回收策略
+      this.memoryOffset = 0
+      if (size > this.sharedMemoryConfig.memorySize) {
+        return -1 // 单个数据块太大
+      }
     }
     
     const offset = this.memoryOffset
