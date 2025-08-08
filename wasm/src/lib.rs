@@ -2,6 +2,11 @@ mod utils;
 
 use wasm_bindgen::prelude::*;
 use md5::{Md5, Digest};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+// 全局哈希状态管理
+static HASH_STATES: std::sync::LazyLock<Arc<Mutex<HashMap<String, Md5>>>> = 
+    std::sync::LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 #[wasm_bindgen]
 extern "C" {
@@ -95,5 +100,62 @@ impl Md5Calculator {
     #[wasm_bindgen]
     pub fn is_log_enabled(&self) -> bool {
         self.enable_log
+    }
+
+    /// 开始增量MD5计算
+    #[wasm_bindgen]
+    pub fn start_incremental_md5(&self, session_id: &str) {
+        let mut states = HASH_STATES.lock().unwrap();
+        states.insert(session_id.to_string(), Md5::new());
+        console_log!(self.enable_log, "Started incremental MD5 session: {}", session_id);
+    }
+
+    /// 更新增量MD5计算
+    #[wasm_bindgen]
+    pub fn update_incremental_md5(&self, session_id: &str, data: &[u8]) -> bool {
+        let mut states = HASH_STATES.lock().unwrap();
+        if let Some(hasher) = states.get_mut(session_id) {
+            hasher.update(data);
+            console_log!(self.enable_log, "Updated incremental MD5 session: {}, data length: {}", session_id, data.len());
+            true
+        } else {
+            console_log!(self.enable_log, "Incremental MD5 session not found: {}", session_id);
+            false
+        }
+    }
+
+    /// 完成增量MD5计算并获取结果
+    #[wasm_bindgen]
+    pub fn finalize_incremental_md5(&self, session_id: &str, md5_length: usize) -> String {
+        let mut states = HASH_STATES.lock().unwrap();
+        if let Some(hasher) = states.remove(session_id) {
+            let hash = hasher.finalize();
+            let hash_string = format!("{:x}", hash);
+            
+            let truncated_hash = match md5_length {
+                16 => hash_string[..16].to_string(),
+                32 => hash_string,
+                _ => hash_string[..std::cmp::min(md5_length, hash_string.len())].to_string(),
+            };
+
+            console_log!(self.enable_log, "Finalized incremental MD5 session: {}, result: {}", session_id, truncated_hash);
+            truncated_hash
+        } else {
+            console_log!(self.enable_log, "Incremental MD5 session not found for finalization: {}", session_id);
+            String::new()
+        }
+    }
+
+    /// 取消增量MD5计算
+    #[wasm_bindgen]
+    pub fn cancel_incremental_md5(&self, session_id: &str) -> bool {
+        let mut states = HASH_STATES.lock().unwrap();
+        let removed = states.remove(session_id).is_some();
+        if removed {
+            console_log!(self.enable_log, "Cancelled incremental MD5 session: {}", session_id);
+        } else {
+            console_log!(self.enable_log, "Incremental MD5 session not found for cancellation: {}", session_id);
+        }
+        removed
     }
 }

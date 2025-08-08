@@ -205,11 +205,11 @@ function passArray8ToWasm0(arg, malloc) {
     return ptr;
 }
 function __wbg_adapter_20(arg0, arg1, arg2) {
-    wasm.closure19_externref_shim(arg0, arg1, arg2);
+    wasm.closure25_externref_shim(arg0, arg1, arg2);
 }
 
-function __wbg_adapter_37(arg0, arg1, arg2, arg3) {
-    wasm.closure36_externref_shim(arg0, arg1, arg2, arg3);
+function __wbg_adapter_41(arg0, arg1, arg2, arg3) {
+    wasm.closure42_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 const Md5CalculatorFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -262,6 +262,60 @@ export class Md5Calculator {
      */
     is_log_enabled() {
         const ret = wasm.md5calculator_is_log_enabled(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * 开始增量MD5计算
+     * @param {string} session_id
+     */
+    start_incremental_md5(session_id) {
+        const ptr0 = passStringToWasm0(session_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.md5calculator_start_incremental_md5(this.__wbg_ptr, ptr0, len0);
+    }
+    /**
+     * 更新增量MD5计算
+     * @param {string} session_id
+     * @param {Uint8Array} data
+     * @returns {boolean}
+     */
+    update_incremental_md5(session_id, data) {
+        const ptr0 = passStringToWasm0(session_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.md5calculator_update_incremental_md5(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        return ret !== 0;
+    }
+    /**
+     * 完成增量MD5计算并获取结果
+     * @param {string} session_id
+     * @param {number} md5_length
+     * @returns {string}
+     */
+    finalize_incremental_md5(session_id, md5_length) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ptr0 = passStringToWasm0(session_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.md5calculator_finalize_incremental_md5(this.__wbg_ptr, ptr0, len0, md5_length);
+            deferred2_0 = ret[0];
+            deferred2_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * 取消增量MD5计算
+     * @param {string} session_id
+     * @returns {boolean}
+     */
+    cancel_incremental_md5(session_id) {
+        const ptr0 = passStringToWasm0(session_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.md5calculator_cancel_incremental_md5(this.__wbg_ptr, ptr0, len0);
         return ret !== 0;
     }
 }
@@ -329,7 +383,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wbg_adapter_37(a, state0.b, arg0, arg1);
+                    return __wbg_adapter_41(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -399,8 +453,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper86 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 20, __wbg_adapter_20);
+    imports.wbg.__wbindgen_closure_wrapper116 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 26, __wbg_adapter_20);
         return ret;
     };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {
