@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# WASM files
+wasm/pkg/
+*.wasm
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
+# Other
+.DS_Store
+*.min.js
+*.min.css
