@@ -46,7 +46,7 @@ class Md5CalculatorPool {
 
   private createWorker(): Worker {
     // 创建Worker，引用独立的Worker文件
-    const worker = new Worker(new URL('./md5-worker.ts', import.meta.url), { type: 'module' })
+    const worker = new Worker(new URL('./md5-worker.js', import.meta.url), { type: 'module' })
     
     worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
       const { id, type, data } = e.data
