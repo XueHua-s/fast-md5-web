@@ -45,10 +45,6 @@ impl Md5Calculator {
     pub async fn calculate_md5_async(&self, data: &[u8], md5_length: usize) -> String {
         let data_len = data.len();
         
-        if data_len == 0 {
-            return String::new();
-        }
-
         console_log!(self.enable_log, "Starting async MD5 calculation, data length: {}", data_len);
 
         let mut hasher = Md5::new();
