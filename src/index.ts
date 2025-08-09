@@ -305,8 +305,16 @@ class Md5CalculatorPool {
     }
   }
 
-  private processSmallFile(task: Task, worker: Worker): void {
-    const data = task.data as Uint8Array
+  private async processSmallFile(task: Task, worker: Worker): Promise<void> {
+    let data: Uint8Array
+    
+    // 如果是File对象，需要先读取为Uint8Array
+    if (task.data instanceof File) {
+      const arrayBuffer = await task.data.arrayBuffer()
+      data = new Uint8Array(arrayBuffer)
+    } else {
+      data = task.data as Uint8Array
+    }
 
     if (
       this.sharedMemoryConfig.enabled &&
@@ -431,7 +439,7 @@ class Md5CalculatorPool {
         if (task.isLargeFile && task.data instanceof File) {
           this.processLargeFile(task, worker)
         } else {
-          this.processSmallFile(task, worker)
+          this.processSmallFile(task, worker).catch(wrappedReject)
         }
       } else {
         this.pendingTasks.push(task)

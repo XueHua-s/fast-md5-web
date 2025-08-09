@@ -205,11 +205,11 @@ function passArray8ToWasm0(arg, malloc) {
     return ptr;
 }
 function __wbg_adapter_20(arg0, arg1, arg2) {
-    wasm.closure25_externref_shim(arg0, arg1, arg2);
+    wasm.closure27_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_41(arg0, arg1, arg2, arg3) {
-    wasm.closure42_externref_shim(arg0, arg1, arg2, arg3);
+    wasm.closure44_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 const Md5CalculatorFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -453,8 +453,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper116 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 26, __wbg_adapter_20);
+    imports.wbg.__wbindgen_closure_wrapper119 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 28, __wbg_adapter_20);
         return ret;
     };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {

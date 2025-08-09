@@ -71,7 +71,8 @@ impl Md5Calculator {
             }
         } else {
             // 小文件直接处理，无需让出控制权
-            hasher.update(&data);
+            console_log!(self.enable_log, "Processing small file directly, data slice: {:?}", &data[..std::cmp::min(data.len(), 20)]);
+            hasher.update(data);
         }
         
         let hash = hasher.finalize();
