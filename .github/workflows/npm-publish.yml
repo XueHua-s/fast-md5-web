@@ -76,9 +76,7 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           
-          # Commit version change
-          git add package.json
-          git commit -m "chore: bump version to $NEW_VERSION"
+          # Note: Do not commit version change yet, wait until after successful NPM publish
       
       - name: Build project
         run: |
@@ -98,8 +96,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
       
-      - name: Push version commit
+      - name: Commit and push version change
         run: |
+          # Commit version change after successful NPM publish
+          git add package.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
           git push origin main
       
       - name: Create GitHub Release
