@@ -101,7 +101,7 @@ pool.destroy();
 // Method 1b: Traditional Worker Pool (without SharedArrayBuffer)
 const traditionalPool = new Md5CalculatorPool(4); // Uses message passing by default
 
-// Method 2: Direct WASM usage (Recommended for single large files)
+// Method 2: Direct WASM usage (Recommended for single small files)
 await WasmInit();
 const calculator = new Md5Calculator();
 
