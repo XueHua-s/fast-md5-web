@@ -18,7 +18,9 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
+    "prepare": "husky",
+    "commitlint": "commitlint --edit --verbose"
   },
   "keywords": [
     "typescript",
@@ -30,6 +32,8 @@
   "author": "Snow <lijiaxin@xhblog.top>",
   "license": "MIT",
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "@eslint/js": "^9.32.0",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
@@ -37,12 +41,14 @@
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "husky": "^9.1.7",
+    "oxlint": "^1.14.0",
     "prettier": "^3.6.2",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
   },
- "files": [
+  "files": [
     "dist",
     "wasm/pkg/**/*",
     "package.json"
@@ -52,6 +58,13 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "bash -c 'tsc -p tsconfig.json --noEmit'",      
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "uuid": "^11.1.0"

@@ -45,7 +45,7 @@ interface Task {
   data: Uint8Array | File
   md5Length: number
   resolve: (value: string) => void
-  reject: (reason: any) => void
+  reject: (reason: Error | string) => void
   priority: number
   isLargeFile: boolean
   onProgress?: (progress: number) => void
@@ -69,7 +69,7 @@ class Md5CalculatorPool {
     string,
     {
       resolve: (value: string) => void
-      reject: (reason: any) => void
+      reject: (reason: Error | string) => void
       onProgress?: (progress: number) => void
     }
   >()
@@ -307,7 +307,7 @@ class Md5CalculatorPool {
 
   private async processSmallFile(task: Task, worker: Worker): Promise<void> {
     let data: Uint8Array
-    
+
     // 如果是File对象，需要先读取为Uint8Array
     if (task.data instanceof File) {
       const arrayBuffer = await task.data.arrayBuffer()
@@ -343,11 +343,14 @@ class Md5CalculatorPool {
     // 回退到零拷贝传输
     // 对于小文件，创建新的ArrayBuffer以确保数据完整性
     let buffer: ArrayBuffer
-    
+
     if (data.byteLength === 0) {
       // 处理空文件的情况
       buffer = new ArrayBuffer(0)
-    } else if (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength) {
+    } else if (
+      data.byteOffset === 0 &&
+      data.byteLength === data.buffer.byteLength
+    ) {
       // 如果Uint8Array使用了整个buffer，直接使用原buffer
       // 确保是ArrayBuffer类型，如果是SharedArrayBuffer则复制数据
       if (data.buffer instanceof ArrayBuffer) {
@@ -361,7 +364,7 @@ class Md5CalculatorPool {
       buffer = new ArrayBuffer(data.byteLength)
       new Uint8Array(buffer).set(data)
     }
-    
+
     worker.postMessage(
       {
         id: task.id,
@@ -408,7 +411,7 @@ class Md5CalculatorPool {
         resolve(result)
       }
 
-      const wrappedReject = (error: any) => {
+      const wrappedReject = (error: Error | string) => {
         clearTimeout(timeoutId)
         reject(error)
       }
@@ -572,7 +575,20 @@ class Md5CalculatorPool {
       fragmentation: number
     }
   } {
-    const status: any = {
+    const status: {
+      totalWorkers: number
+      availableWorkers: number
+      pendingTasks: number
+      activeTasks: number
+      maxConcurrentTasks: number
+      sharedMemoryEnabled: boolean
+      sharedMemoryUsage?: {
+        total: number
+        used: number
+        available: number
+        fragmentation: number
+      }
+    } = {
       totalWorkers: this.workers.length,
       availableWorkers: this.availableWorkers.length,
       pendingTasks: this.pendingTasks.length,

@@ -6,6 +6,7 @@ yarn-error.log*
 pnpm-debug.log*
 # Build outputs
 dist/
+!example/*/dist/
 build/
 *.tsbuildinfo
 
