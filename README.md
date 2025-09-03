@@ -270,6 +270,8 @@ npm run clean
 - **Multi-thread workers**: ~16x faster than spark-md5 🚀
 - **Live Demo**: [View performance test results](./example/test-fast-md5/dist/index.html)
 
+![Multi-thread Test Results](./docs/a3d25c4789a9937d8a1fc76c12b61152.png)
+
 ### Core Performance Features
 - **WebAssembly**: Leverages Rust's performance for MD5 calculation
 - **Streaming Processing**: Handles large files without loading entire content into memory
