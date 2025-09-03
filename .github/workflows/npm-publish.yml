@@ -1,0 +1,131 @@
+name: NPM Publish and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Configure git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      
+      - name: Bump version
+        id: version
+        run: |
+          # Get current version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Bump version based on input
+          case "${{ github.event.inputs.version_type }}" in
+            "major")
+              NEW_VERSION=$(npm version major --no-git-tag-version)
+              ;;
+            "minor")
+              NEW_VERSION=$(npm version minor --no-git-tag-version)
+              ;;
+            "patch")
+              NEW_VERSION=$(npm version patch --no-git-tag-version)
+              ;;
+          esac
+          
+          # Remove 'v' prefix from npm version output
+          NEW_VERSION=${NEW_VERSION#v}
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Commit version change
+          git add package.json
+          git commit -m "chore: bump version to $NEW_VERSION"
+      
+      - name: Build project
+        run: |
+          pnpm run build
+      
+      - name: Run tests (if available)
+        run: |
+          if [ -f "package.json" ] && grep -q '"test"' package.json; then
+            pnpm test
+          else
+            echo "No tests found, skipping..."
+          fi
+        continue-on-error: true
+      
+      - name: Publish to NPM
+        run: pnpm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+      
+      - name: Push version commit
+        run: |
+          git push origin main
+      
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## Changes in v${{ steps.version.outputs.version }}
+            
+            This release was automatically created by GitHub Actions.
+            
+            ### Package Information
+            - **Version**: ${{ steps.version.outputs.version }}
+            - **NPM Package**: [fast-md5-web](https://www.npmjs.com/package/fast-md5-web)
+            - **Build Type**: ${{ github.event.inputs.version_type }} version bump
+            
+            ### Installation
+            ```bash
+            npm install fast-md5-web@${{ steps.version.outputs.version }}
+            # or
+            pnpm add fast-md5-web@${{ steps.version.outputs.version }}
+            # or
+            yarn add fast-md5-web@${{ steps.version.outputs.version }}
+            ```
+          draft: false
+          prerelease: false

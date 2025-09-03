@@ -15,6 +15,7 @@ build/
 .env.local
 pnpm-lock.yaml
 package-lock.json
+yarn.lock
 .env.development.local
 .env.test.local
 .env.production.local
