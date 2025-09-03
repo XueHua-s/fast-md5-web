@@ -78,7 +78,7 @@ pool.destroy();
 // 方法 1b：传统 Worker 池（不使用 SharedArrayBuffer）
 const traditionalPool = new Md5CalculatorPool(4); // 默认使用消息传递
 
-// 方法2：直接使用 WASM（推荐用于单个大文件）
+// 方法2：直接使用 WASM（推荐用于单个小文件快速计算）
 await WasmInit();
 const calculator = new Md5Calculator();
 
