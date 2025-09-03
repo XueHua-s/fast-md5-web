@@ -4,7 +4,7 @@
 
 ---
 
-🚀 **Possibly the fastest MD5 calculation library for web environments** - powered by Rust WebAssembly with **Web Worker** support for truly non-blocking computation. **100x faster** than spark-md5 in specific scenarios when processing 1000+ large files.
+🚀 **Possibly the fastest MD5 calculation library for web environments** - powered by Rust WebAssembly with **Web Worker** support for truly non-blocking computation. **8x faster** in single-thread mode and **16x faster** with multi-thread workers than spark-md5 in specific scenarios.
 
 ⚡ **ESM-only package** - Supports modern browsers, Node.js, and Deno with ES modules. **No CommonJS support**.
 
@@ -13,7 +13,7 @@
 - 🧵 **Web Worker Pool** - True parallel processing with configurable worker threads, prevents UI blocking
 - 🚀 **SharedArrayBuffer Support** - Zero-copy data transfer between main thread and workers for maximum performance
 - 🦀 **Rust WebAssembly** - Native performance with Rust compiled to WebAssembly
-- ⚡ **100x Performance** - Dramatically faster than spark-md5 for batch processing 1000+ files
+- ⚡ **High Performance** - 8x faster in single-thread mode, 16x faster with multi-thread workers than spark-md5 for batch processing
 - 📦 **ESM-only** - Modern ES modules for browsers, Node.js, and Deno (no CommonJS)
 - 📝 **TypeScript Support** - Full TypeScript declarations and type safety
 - 🔄 **Streaming Processing** - Incremental MD5 calculation for large files (200MB+) without memory overflow
@@ -265,10 +265,10 @@ npm run clean
 
 ### 🏆 Benchmark Results
 
-**Processing 1000 large files (10MB each):**
-- **fast-md5-web**: ~2.5 seconds ⚡
-- **spark-md5**: ~250+ seconds 🐌
-- **Performance gain**: **100x faster** 🚀
+**Performance Comparison:**
+- **Single-thread mode**: ~8x faster than spark-md5 ⚡
+- **Multi-thread workers**: ~16x faster than spark-md5 🚀
+- **Live Demo**: [View performance test results](./example/test-fast-md5/dist/index.html)
 
 ### Core Performance Features
 - **WebAssembly**: Leverages Rust's performance for MD5 calculation

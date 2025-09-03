@@ -17,7 +17,45 @@ export default [
       },
       globals: {
         console: 'readonly',
-        process: 'readonly'
+        process: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        Promise: 'readonly'
+      }
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      prettier: prettier
+    },
+    rules: {
+      ...tseslint.configs.recommended.rules,
+      ...prettierConfig.rules,
+      'prettier/prettier': 'error',
+      '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-inferrable-types': 'off',
+      'prefer-const': 'error',
+      'no-var': 'error'
+    }
+  },
+  {
+    files: ['src/md5-worker.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        project: './tsconfig.json'
+      },
+      globals: {
+        console: 'readonly',
+        self: 'readonly',
+        MessageEvent: 'readonly',
+        postMessage: 'readonly',
+        onmessage: 'writable',
+        importScripts: 'readonly'
       }
     },
     plugins: {

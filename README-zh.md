@@ -4,7 +4,7 @@
 
 ---
 
-🚀 **可能是Web 环境下最快的 MD5 计算库** - 基于 Rust WebAssembly，支持 **Web Worker** 实现真正的非阻塞计算。特定场景下处理 1000+ 大文件时比 spark-md5 **快 100 倍**。
+🚀 **可能是Web 环境下最快的 MD5 计算库** - 基于 Rust WebAssembly，支持 **Web Worker** 实现真正的非阻塞计算。单线程模式比 spark-md5 **快 8 倍**，多线程 Worker 模式**快 16 倍**。
 
 ⚡ **纯 ESM 包** - 支持现代浏览器、Node.js 和 Deno 的 ES 模块。**不支持 CommonJS**。
 
@@ -13,7 +13,7 @@
 - 🧵 **Web Worker 池** - 真正的并行处理，可配置工作线程，防止 UI 阻塞
 - 🚀 **SharedArrayBuffer 支持** - 主线程与 Worker 间零拷贝数据传输，实现最大性能
 - 🦀 **Rust WebAssembly** - 编译为 WebAssembly 的原生 Rust 性能
-- ⚡ **100倍性能** - 批量处理 1000+ 文件时比 spark-md5 快得多
+- ⚡ **高性能** - 单线程模式比 spark-md5 快 8 倍，多线程 Worker 模式快 16 倍
 - 📦 **纯 ESM** - 支持浏览器、Node.js 和 Deno 的现代 ES 模块（不支持 CommonJS）
 - 📝 **TypeScript 支持** - 完整的 TypeScript 声明和类型安全
 - 🔄 **异步处理** - 大文件分块处理，支持控制权让出
@@ -239,10 +239,10 @@ npm run clean
 
 ### 🏆 基准测试结果
 
-**处理 1000 个大文件（每个 10MB）：**
-- **fast-md5-web**: ~2.5 秒 ⚡
-- **spark-md5**: ~250+ 秒 🐌
-- **性能提升**: **快 100 倍** 🚀
+**性能对比：**
+- **单线程模式**: 比 spark-md5 快约 8 倍 ⚡
+- **多线程 Worker**: 比 spark-md5 快约 16 倍 🚀
+- **在线演示**: [查看性能测试结果](./example/test-fast-md5/dist/index.html)
 
 ### 关键优化
 

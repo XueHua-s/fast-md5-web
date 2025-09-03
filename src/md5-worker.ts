@@ -31,7 +31,7 @@ let sharedMemoryView: Uint8Array | null = null
 
 // 流式处理状态
 interface StreamState {
-  hasher: any // MD5 hasher instance
+  hasher: Md5Calculator // MD5 hasher instance
   processedChunks: number
   totalChunks: number
   totalSize: number
@@ -92,15 +92,18 @@ self.onmessage = async function (e: MessageEvent<WorkerMessage>) {
 
 async function initializeStreamProcessing(
   id: string,
-  data: any
+  data: WorkerMessage['data']
 ): Promise<void> {
+  if (!data) {
+    throw new Error('No data provided for stream processing initialization')
+  }
+
   if (!calculator) {
     await WasmInit()
     calculator = new Md5Calculator()
   }
 
-  // 创建新的MD5计算器实例用于流式处理
-  const hasher = new Md5Calculator()
+  const hasher = calculator
 
   // 启动增量MD5计算会话
   hasher.start_incremental_md5(id)
@@ -118,7 +121,14 @@ async function initializeStreamProcessing(
   )
 }
 
-async function processChunk(id: string, data: any): Promise<void> {
+async function processChunk(
+  id: string,
+  data: WorkerMessage['data']
+): Promise<void> {
+  if (!data) {
+    throw new Error('No data provided for chunk processing')
+  }
+
   const state = streamStates.get(id)
   if (!state) {
     throw new Error('Stream state not found')
@@ -177,7 +187,14 @@ async function processChunk(id: string, data: any): Promise<void> {
   }
 }
 
-async function processNormalFile(id: string, data: any): Promise<void> {
+async function processNormalFile(
+  id: string,
+  data: WorkerMessage['data']
+): Promise<void> {
+  if (!data) {
+    throw new Error('No data provided for file processing')
+  }
+
   if (!calculator) {
     await WasmInit()
     calculator = new Md5Calculator()
@@ -211,7 +228,7 @@ async function processNormalFile(id: string, data: any): Promise<void> {
   // 使用异步方法计算MD5
   const result = await calculator.calculate_md5_async(
     fileData,
-    data!.md5Length!
+    data.md5Length || 32
   )
 
   self.postMessage({
