@@ -396,23 +396,30 @@ class Md5CalculatorPool {
           : data.length > DEFAULT_CHUNK_SIZE
 
       // 设置超时处理
-      const timeoutId = setTimeout(() => {
-        const callbacks = this.taskCallbacks.get(taskId)
-        if (callbacks) {
-          this.taskCallbacks.delete(taskId)
-          this.activeTasks.delete(taskId)
-          this.releaseSharedMemory(taskId)
-          reject(new Error(`MD5 calculation timeout after ${timeout}ms`))
-        }
-      }, timeout)
+      let timeoutId: number | unknown
+      if (timeout !== 0) {
+        timeoutId = setTimeout(() => {
+          const callbacks = this.taskCallbacks.get(taskId)
+          if (callbacks) {
+            this.taskCallbacks.delete(taskId)
+            this.activeTasks.delete(taskId)
+            this.releaseSharedMemory(taskId)
+            reject(new Error(`MD5 calculation timeout after ${timeout}ms`))
+          }
+        }, timeout)
+      }
 
       const wrappedResolve = (result: string) => {
-        clearTimeout(timeoutId)
+        if (timeoutId) {
+          clearTimeout(timeoutId as number)
+        }
         resolve(result)
       }
 
       const wrappedReject = (error: Error | string) => {
-        clearTimeout(timeoutId)
+        if (timeoutId) {
+          clearTimeout(timeoutId as number)
+        }
         reject(error)
       }
 
@@ -650,13 +657,20 @@ class Md5CalculatorPool {
   public async calculateMd5Batch(
     files: (Uint8Array | File)[],
     md5Length: number = 32,
+    timeout: number = 60000,
     onProgress?: (completed: number, total: number) => void
   ): Promise<string[]> {
     const results: string[] = []
     let completed = 0
 
     const promises = files.map((file, index) =>
-      this.calculateMd5(file, md5Length, 60000, undefined, files.length - index) // 后面的文件优先级更高
+      this.calculateMd5(
+        file,
+        md5Length,
+        timeout,
+        undefined,
+        files.length - index
+      ) // 后面的文件优先级更高
         .then(result => {
           results[index] = result
           completed++

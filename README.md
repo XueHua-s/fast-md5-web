@@ -180,6 +180,7 @@ class Md5CalculatorPool {
   async calculateMd5Batch(
     files: (Uint8Array | File)[], 
     md5Length?: number,
+    timeout?: number, // singleFileTimeoutSetting
     onProgress?: (completed: number, total: number) => void
   ): Promise<string[]>;
   
@@ -241,6 +242,29 @@ npm run format:check
 
 # Clean build artifacts
 npm run clean
+```
+
+## ⚠️ Production Environment Requirements
+
+To use SharedArrayBuffer for optimal performance in a production environment, your website must meet the following conditions:
+
+1. **Must be served over HTTPS** - This is essential for creating a secure context.
+2. **Must set Cross-Origin Isolation HTTP headers**:
+   ```
+   Cross-Origin-Opener-Policy: same-origin
+   Cross-Origin-Embedder-Policy: require-corp
+   ```
+
+## ⏱️ Timeout Setting
+
+In the `calculateMd5` method, the `timeout` parameter controls the calculation timeout in milliseconds.
+- Default value: 60000ms (1 minute)
+- Set to 0 to disable timeout
+
+Example:
+```typescript
+// Disable timeout
+await pool.calculateMd5(file, 32, 0);
 ```
 
 ## 📁 Project Structure

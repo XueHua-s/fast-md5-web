@@ -142,6 +142,7 @@ class Md5CalculatorPool {
   async calculateMd5Batch(
     files: (Uint8Array | File)[], 
     md5Length?: number,
+    timeout?: number, // 单个文件的超时时间
     onProgress?: (completed: number, total: number) => void
   ): Promise<string[]>;
   
@@ -215,6 +216,29 @@ npm run format:check
 
 # 清理构建产物
 npm run clean
+```
+
+## ⚠️ 生产环境要求
+
+要在生产环境中使用 SharedArrayBuffer 以获得最佳性能，您的网站必须满足以下条件：
+
+1. **必须通过 HTTPS 提供服务** - 这是创建安全上下文的必要条件
+2. **必须设置跨源隔离 HTTP 头部**：
+   ```
+   Cross-Origin-Opener-Policy: same-origin
+   Cross-Origin-Embedder-Policy: require-corp
+   ```
+
+## ⏱️ 超时设置
+
+在 `calculateMd5` 方法中，`timeout` 参数控制计算超时时间（毫秒）。
+- 默认值：60000ms（1分钟）
+- 设置为 0 表示不设置超时
+
+示例：
+```typescript
+// 不设置超时
+await pool.calculateMd5(file, 32, 0);
 ```
 
 ## 📁 项目结构

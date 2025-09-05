@@ -34,7 +34,7 @@ onMounted(async () => {
       },
       navigator.hardwareConcurrency
     )
-    
+
     wasmInitialized = true
     console.log('Fast-MD5-Web pool initialized successfully with', navigator.hardwareConcurrency, 'workers')
   } catch (error) {
@@ -57,7 +57,7 @@ const testMD5Performance = async () => {
   testResults.value = []
 
   const files = Array.from(selectedFiles.value)
-  
+
   try {
     // 并行处理所有文件的SparkMD5计算
     const sparkStartTime = performance.now()
@@ -144,19 +144,19 @@ const calculateFastMD5 = async (file: File): Promise<string> => {
   if (!wasmInitialized || !md5CalculatorPool) {
     throw new Error('Fast-MD5-Web 工作池未初始化')
   }
-  
+
   // 使用工作池计算MD5，支持大文件和进度跟踪
   const hash = await md5CalculatorPool.calculateMd5(
     file,
     32, // MD5 length
-    undefined, // timeout (使用默认值)
+    0, // timeout (不设置超时)
     (progress) => {
       // 可选：显示进度（这里暂时注释掉避免过多日志）
       // console.log(`${file.name} progress: ${progress.toFixed(1)}%`)
     },
     1 // priority (1 = high priority)
   )
-  
+
   return hash
 }
 
@@ -176,20 +176,20 @@ const formatTime = (ms: number): string => {
 <template>
   <div class="container">
     <h1>MD5 性能测试：spark-md5 vs fast-md5-web</h1>
-    
+
     <div class="file-selector">
       <label for="file-input">选择文件进行测试：</label>
-      <input 
+      <input
         id="file-input"
-        type="file" 
-        multiple 
+        type="file"
+        multiple
         @change="handleFileSelect"
         :disabled="isLoading"
       />
     </div>
 
-    <button 
-      @click="testMD5Performance" 
+    <button
+      @click="testMD5Performance"
       :disabled="isLoading || !selectedFiles"
       class="test-button"
     >
@@ -206,8 +206,8 @@ const formatTime = (ms: number): string => {
           <div>Fast-MD5-Web 哈希</div>
           <div>哈希匹配</div>
         </div>
-        <div 
-          v-for="result in testResults" 
+        <div
+          v-for="result in testResults"
           :key="result.fileName"
           class="table-row"
         >
@@ -493,12 +493,12 @@ h1 {
     grid-template-columns: 1fr;
     gap: 5px;
   }
-  
+
   .table-header > div,
   .table-row > div {
     padding: 5px 0;
   }
-  
+
   .hash {
     font-size: 10px;
   }
