@@ -149,7 +149,7 @@ const calculateFastMD5 = async (file: File): Promise<string> => {
   const hash = await md5CalculatorPool.calculateMd5(
     file,
     32, // MD5 length
-    0, // timeout (使用默认值)
+    0, // timeout (不设置超时)
     (progress) => {
       // 可选：显示进度（这里暂时注释掉避免过多日志）
       // console.log(`${file.name} progress: ${progress.toFixed(1)}%`)
