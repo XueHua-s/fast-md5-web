@@ -7,5 +7,11 @@ export default defineConfig({
   plugins: [vue()],
   optimizeDeps: {
     exclude: ['fast-md5-web']
-  }
+  },
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
 })
