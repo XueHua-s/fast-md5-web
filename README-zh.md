@@ -292,6 +292,15 @@ await pool.calculateMd5(file, 32, 0);
 - **SharedArrayBuffer 模式**：1 倍内存使用（共享数据）
 - **内存节省**：最多减少 50% 内存使用
 
+## 🤝 贡献
+
+我们欢迎贡献！请阅读我们的[贡献指南](docs/CONTRIBUTING.md)，了解如何提交 Pull Request、报告问题以及为项目做贡献的详细信息。
+
+### 快速链接
+- [贡献指南](docs/CONTRIBUTING.md) - 完整的贡献者指南
+- [Issues](https://github.com/XueHua-s/rust-wasm-calculate-file-md5/issues) - 报告 Bug 或请求新功能
+- [Discussions](https://github.com/XueHua-s/rust-wasm-calculate-file-md5/discussions) - 提问和讨论想法
+
 ## 📄 许可证
 
 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。

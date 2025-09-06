@@ -79,6 +79,8 @@ class Md5CalculatorPool {
   private sharedMemoryView: Uint8Array | null = null
   private memoryBlocks: MemoryBlock[] = []
   private maxConcurrentTasks: number
+  private maxConcurrentFileReads: number
+  private activeFileReads = new Set<string>()
 
   constructor(
     poolSize: number = 4,
@@ -87,6 +89,7 @@ class Md5CalculatorPool {
   ) {
     this.poolSize = poolSize
     this.maxConcurrentTasks = maxConcurrentTasks || poolSize
+    this.maxConcurrentFileReads = Math.min(8, navigator.hardwareConcurrency)
     this.sharedMemoryConfig = sharedMemoryConfig || {
       enabled: false,
       memorySize: DEFAULT_SHARED_MEMORY_SIZE,
@@ -171,10 +174,11 @@ class Md5CalculatorPool {
           this.taskCallbacks.delete(id)
           this.activeTasks.delete(id)
 
-          // 释放共享内存
+          // 释放共享内存和文件读取槽位
           if (task?.isLargeFile) {
             this.releaseSharedMemory(id)
           }
+          this.releaseFileReadSlot(id)
 
           if (type === 'result') {
             callbacks.resolve(data!.result!)
@@ -258,50 +262,70 @@ class Md5CalculatorPool {
     const chunkSize = this.sharedMemoryConfig.chunkSize
     const totalChunks = Math.ceil(file.size / chunkSize)
 
-    // 为大文件分配共享内存
-    const memoryOffset = this.allocateSharedMemory(chunkSize, task.id)
-    if (memoryOffset === -1) {
-      // 共享内存不足，回退到普通处理
-      const uint8Array = new Uint8Array(await file.arrayBuffer())
-      this.processSmallFile({ ...task, data: uint8Array }, worker)
-      return
-    }
+    // 等待文件读取槽位
+    await this.waitForFileReadSlot(task.id)
 
-    worker.postMessage({
-      id: task.id,
-      type: 'calculate',
-      data: {
-        dataOffset: memoryOffset,
-        dataLength: file.size,
-        md5Length: task.md5Length,
-        isStreamMode: true,
-        totalChunks,
-      },
-    } as WorkerMessage)
-
-    // 分块读取文件并写入共享内存
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * chunkSize
-      const end = Math.min(start + chunkSize, file.size)
-      const chunk = file.slice(start, end)
-      const chunkData = new Uint8Array(await chunk.arrayBuffer())
-
-      if (this.sharedMemoryView) {
-        this.sharedMemoryView.set(chunkData, memoryOffset)
-
-        worker.postMessage({
-          id: task.id,
-          type: 'calculate_chunk',
-          data: {
-            chunkIndex: i,
-            dataLength: chunkData.length,
-            dataOffset: memoryOffset,
-          },
-        } as WorkerMessage)
+    try {
+      // 为大文件分配共享内存
+      const memoryOffset = this.allocateSharedMemory(chunkSize, task.id)
+      if (memoryOffset === -1) {
+        // 共享内存不足，回退到普通处理
+        const uint8Array = new Uint8Array(await file.arrayBuffer())
+        this.processSmallFile({ ...task, data: uint8Array }, worker)
+        return
       }
 
-      // 让出控制权，避免阻塞UI
-      await new Promise(resolve => setTimeout(resolve, 0))
+      worker.postMessage({
+        id: task.id,
+        type: 'calculate',
+        data: {
+          dataOffset: memoryOffset,
+          dataLength: file.size,
+          md5Length: task.md5Length,
+          isStreamMode: true,
+          totalChunks,
+        },
+      } as WorkerMessage)
+
+      // 分块读取文件并写入共享内存
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize
+        const end = Math.min(start + chunkSize, file.size)
+
+        try {
+          const chunk = file.slice(start, end)
+          const chunkData = new Uint8Array(await chunk.arrayBuffer())
+
+          if (this.sharedMemoryView) {
+            this.sharedMemoryView.set(chunkData, memoryOffset)
+
+            worker.postMessage({
+              id: task.id,
+              type: 'calculate_chunk',
+              data: {
+                chunkIndex: i,
+                dataLength: chunkData.length,
+                dataOffset: memoryOffset,
+              },
+            } as WorkerMessage)
+          }
+        } catch (error) {
+          // 处理文件读取错误，可能是文件句柄耗尽
+          if (error instanceof Error && error.name === 'NotReadableError') {
+            // 等待一段时间后重试
+            await new Promise(resolve => setTimeout(resolve, 100))
+            i-- // 重试当前分块
+            continue
+          }
+          throw error
+        }
+
+        // 让出控制权，避免阻塞UI，并给文件系统时间释放资源
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+    } finally {
+      // 释放文件读取槽位
+      this.releaseFileReadSlot(task.id)
     }
   }
 
@@ -310,8 +334,24 @@ class Md5CalculatorPool {
 
     // 如果是File对象，需要先读取为Uint8Array
     if (task.data instanceof File) {
-      const arrayBuffer = await task.data.arrayBuffer()
-      data = new Uint8Array(arrayBuffer)
+      // 等待文件读取槽位
+      await this.waitForFileReadSlot(task.id)
+      try {
+        const arrayBuffer = await task.data.arrayBuffer()
+        data = new Uint8Array(arrayBuffer)
+      } catch (error) {
+        // 处理文件读取错误
+        if (error instanceof Error && error.name === 'NotReadableError') {
+          // 等待一段时间后重试
+          await new Promise(resolve => setTimeout(resolve, 200))
+          const arrayBuffer = await task.data.arrayBuffer()
+          data = new Uint8Array(arrayBuffer)
+        } else {
+          throw error
+        }
+      } finally {
+        this.releaseFileReadSlot(task.id)
+      }
     } else {
       data = task.data as Uint8Array
     }
@@ -404,6 +444,7 @@ class Md5CalculatorPool {
             this.taskCallbacks.delete(taskId)
             this.activeTasks.delete(taskId)
             this.releaseSharedMemory(taskId)
+            this.releaseFileReadSlot(taskId)
             reject(new Error(`MD5 calculation timeout after ${timeout}ms`))
           }
         }, timeout)
@@ -692,6 +733,7 @@ class Md5CalculatorPool {
       this.activeTasks.delete(taskId)
       this.taskCallbacks.delete(taskId)
       this.releaseSharedMemory(taskId)
+      this.releaseFileReadSlot(taskId)
       task.reject(new Error('Task cancelled'))
       return true
     }
@@ -704,6 +746,18 @@ class Md5CalculatorPool {
     }
 
     return false
+  }
+
+  private async waitForFileReadSlot(taskId: string): Promise<void> {
+    // 如果已经超过最大并发文件读取数，等待
+    while (this.activeFileReads.size >= this.maxConcurrentFileReads) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    this.activeFileReads.add(taskId)
+  }
+
+  private releaseFileReadSlot(taskId: string): void {
+    this.activeFileReads.delete(taskId)
   }
 }
 export { Md5CalculatorPool, WasmInit, Md5Calculator }
