@@ -20,7 +20,8 @@ export default [
         process: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
-        Promise: 'readonly'
+        Promise: 'readonly',
+        navigator: 'readonly'
       }
     },
     plugins: {
