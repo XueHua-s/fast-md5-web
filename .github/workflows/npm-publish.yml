@@ -12,10 +12,27 @@ on:
           - major
           - minor
           - patch
+      changelog:
+        description: 'Release changelog (required)'
+        required: true
+        type: string
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate changelog input
+        run: |
+          if [ -z "${{ github.event.inputs.changelog }}" ]; then
+            echo "❌ Changelog is required for release"
+            echo "Please provide a detailed changelog describing the changes in this release."
+            exit 1
+          fi
+          echo "✅ Changelog provided"
+
   publish:
     runs-on: ubuntu-latest
+    needs: validate
     permissions:
       contents: write
       packages: write
@@ -50,6 +67,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install
       
+      - name: Run linting
+        run: pnpm run lint
+      
+      - name: Run type checking
+        run: pnpm run type-check
+      
+      - name: Run formatting check
+        run: pnpm run format:check
+      
       - name: Configure git
         run: |
           git config --local user.email "action@github.com"
@@ -79,8 +105,41 @@ jobs:
           NEW_VERSION=${NEW_VERSION#v}
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Generate changelog file
+        run: |
+          # Create or update CHANGELOG.md
+          if [ ! -f CHANGELOG.md ]; then
+            echo "# Changelog" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            echo "All notable changes to this project will be documented in this file." >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
           
-          # Note: Do not commit version change yet, wait until after successful NPM publish
+          # Prepare new changelog entry
+          TODAY=$(date +"%Y-%m-%d")
+          NEW_ENTRY="## [${{ steps.version.outputs.version }}] - $TODAY"
+          
+          # Create temporary file with new entry
+          cat > temp_changelog.md << EOF
+          # Changelog
+          
+          All notable changes to this project will be documented in this file.
+          
+          $NEW_ENTRY
+          
+          ${{ github.event.inputs.changelog }}
+          
+          EOF
+          
+          # Append existing changelog (skip header)
+          if [ -f CHANGELOG.md ]; then
+            tail -n +4 CHANGELOG.md >> temp_changelog.md
+          fi
+          
+          # Replace original changelog
+          mv temp_changelog.md CHANGELOG.md
       
       - name: Build project
         run: |
@@ -93,18 +152,20 @@ jobs:
           else
             echo "No tests found, skipping..."
           fi
-        continue-on-error: true
+        continue-on-error: false
       
       - name: Publish to NPM
         run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
       
-      - name: Commit and push version change
+      - name: Commit and push changes
         run: |
-          # Commit version change after successful NPM publish
-          git add package.json
-          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+          # Commit version change and changelog after successful NPM publish
+          git add package.json CHANGELOG.md
+          git commit -m "chore: release v${{ steps.version.outputs.version }}
+
+          ${{ github.event.inputs.changelog }}"
           git push origin main
       
       - name: Create GitHub Release
@@ -113,16 +174,20 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: Release v${{ steps.version.outputs.version }}
           body: |
-            ## Changes in v${{ steps.version.outputs.version }}
+            ## Release v${{ steps.version.outputs.version }}
             
-            This release was automatically created by GitHub Actions.
+            ${{ github.event.inputs.changelog }}
             
-            ### Package Information
+            ---
+            
+            ### 📦 Package Information
             - **Version**: ${{ steps.version.outputs.version }}
+            - **Previous Version**: ${{ steps.version.outputs.current_version }}
             - **NPM Package**: [fast-md5-web](https://www.npmjs.com/package/fast-md5-web)
             - **Build Type**: ${{ github.event.inputs.version_type }} version bump
+            - **Release Date**: ${{ steps.date.outputs.date }}
             
-            ### Installation
+            ### 📥 Installation
             ```bash
             npm install fast-md5-web@${{ steps.version.outputs.version }}
             # or
@@ -130,5 +195,20 @@ jobs:
             # or
             yarn add fast-md5-web@${{ steps.version.outputs.version }}
             ```
+            
+            ### 📋 Full Changelog
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ steps.version.outputs.current_version }}...v${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
+          generate_release_notes: true
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: publish
+    if: success()
+    steps:
+      - name: Release notification
+        run: |
+          echo "🎉 Successfully released v${{ needs.publish.outputs.version }}"
+          echo "📦 NPM: https://www.npmjs.com/package/fast-md5-web"
+          echo "🏷️ GitHub Release: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.publish.outputs.version }}"

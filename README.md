@@ -530,6 +530,15 @@ setInterval(() => {
 - Modern browsers (Chrome 68+, Firefox 79+, Safari 15.2+)
 - HTTPS required for SharedArrayBuffer
 - Check CSP policies for worker and WASM support
+## 🤝 Contributing
+
+We welcome contributions! Please read our [Contributing Guide](docs/CONTRIBUTING.md) for detailed information on how to submit pull requests, report issues, and contribute to the project.
+
+### Quick Links
+- [Contributing Guidelines](docs/CONTRIBUTING.md) - Complete guide for contributors
+- [Issues](https://github.com/XueHua-s/rust-wasm-calculate-file-md5/issues) - Report bugs or request features
+- [Discussions](https://github.com/XueHua-s/rust-wasm-calculate-file-md5/discussions) - Ask questions and discuss ideas
+
 ## 📄 License
 
 MIT License - see the [LICENSE](LICENSE) file for details.
