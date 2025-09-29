@@ -2,6 +2,7 @@
 /* eslint-disable */
 export class Md5Calculator {
   free(): void;
+  [Symbol.dispose](): void;
   constructor();
   /**
    * 异步计算文件MD5 - 优化版本，减少内存拷贝
@@ -55,8 +56,8 @@ export interface InitOutput {
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export_6: WebAssembly.Table;
-  readonly closure27_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure44_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure31_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure42_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

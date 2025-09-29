@@ -8,6 +8,9 @@
     "pnpm": ">=8.0.0"
   },
   "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "onlyAllow": "pnpm"
+  },
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
