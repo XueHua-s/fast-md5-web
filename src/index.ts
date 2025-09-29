@@ -81,6 +81,10 @@ class Md5CalculatorPool {
   private maxConcurrentTasks: number
   private maxConcurrentFileReads: number
   private activeFileReads = new Set<string>()
+  private fileReadWaitQueue: Array<{
+    taskId: string
+    resolve: () => void
+  }> = []
 
   constructor(
     poolSize: number = 4,
@@ -234,8 +238,15 @@ class Md5CalculatorPool {
     }
 
     if (this.pendingTasks.length > 0 && this.availableWorkers.length > 0) {
-      // 按优先级排序任务（优先级高的先执行）
-      this.pendingTasks.sort((a, b) => b.priority - a.priority)
+      // 按优先级排序任务，同时优先处理小文件以提高响应速度
+      this.pendingTasks.sort((a, b) => {
+        // 首先按是否为小文件排序（小文件优先）
+        if (a.isLargeFile !== b.isLargeFile) {
+          return a.isLargeFile ? 1 : -1
+        }
+        // 然后按优先级排序
+        return b.priority - a.priority
+      })
 
       const task = this.pendingTasks.shift()!
       const worker = this.availableWorkers.shift()!
@@ -252,7 +263,7 @@ class Md5CalculatorPool {
         this.processLargeFile(task, worker)
       } else {
         // 小文件直接处理
-        this.processSmallFile(task, worker)
+        this.processSmallFile(task, worker).catch(task.reject)
       }
     }
   }
@@ -312,16 +323,15 @@ class Md5CalculatorPool {
         } catch (error) {
           // 处理文件读取错误，可能是文件句柄耗尽
           if (error instanceof Error && error.name === 'NotReadableError') {
-            // 等待一段时间后重试
-            await new Promise(resolve => setTimeout(resolve, 100))
+            // 立即重试当前分块
             i-- // 重试当前分块
             continue
           }
           throw error
         }
 
-        // 让出控制权，避免阻塞UI，并给文件系统时间释放资源
-        await new Promise(resolve => setTimeout(resolve, 10))
+        // 让出控制权，避免阻塞UI
+        await new Promise(resolve => Promise.resolve().then(resolve))
       }
     } finally {
       // 释放文件读取槽位
@@ -342,8 +352,7 @@ class Md5CalculatorPool {
       } catch (error) {
         // 处理文件读取错误
         if (error instanceof Error && error.name === 'NotReadableError') {
-          // 等待一段时间后重试
-          await new Promise(resolve => setTimeout(resolve, 200))
+          // 立即重试一次
           const arrayBuffer = await task.data.arrayBuffer()
           data = new Uint8Array(arrayBuffer)
         } else {
@@ -490,6 +499,7 @@ class Md5CalculatorPool {
         if (task.isLargeFile && task.data instanceof File) {
           this.processLargeFile(task, worker)
         } else {
+          // 对于小文件，立即处理而不等待
           this.processSmallFile(task, worker).catch(wrappedReject)
         }
       } else {
@@ -506,6 +516,13 @@ class Md5CalculatorPool {
     this.availableWorkers = []
     this.pendingTasks = []
     this.taskCallbacks.clear()
+    this.activeFileReads.clear()
+
+    // 清理等待队列中的任务
+    this.fileReadWaitQueue.forEach(({ resolve }) => {
+      resolve() // 允许等待的任务完成或失败
+    })
+    this.fileReadWaitQueue = []
   }
 
   private allocateSharedMemory(size: number, taskId?: string): number {
@@ -750,14 +767,22 @@ class Md5CalculatorPool {
 
   private async waitForFileReadSlot(taskId: string): Promise<void> {
     // 如果已经超过最大并发文件读取数，等待
-    while (this.activeFileReads.size >= this.maxConcurrentFileReads) {
-      await new Promise(resolve => setTimeout(resolve, 50))
+    if (this.activeFileReads.size >= this.maxConcurrentFileReads) {
+      await new Promise<void>(resolve => {
+        this.fileReadWaitQueue.push({ taskId, resolve })
+      })
     }
     this.activeFileReads.add(taskId)
   }
 
   private releaseFileReadSlot(taskId: string): void {
     this.activeFileReads.delete(taskId)
+
+    // 处理等待队列中的下一个任务
+    if (this.fileReadWaitQueue.length > 0) {
+      const next = this.fileReadWaitQueue.shift()!
+      next.resolve()
+    }
   }
 }
 export { Md5CalculatorPool, WasmInit, Md5Calculator }
