@@ -36,6 +36,9 @@
     "pnpm": ">=8.0.0"
   },
   "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "onlyAllow": "pnpm"
+  },
   "devDependencies": {
     "@commitlint/cli": "19.8.1",
     "@commitlint/config-conventional": "19.8.1",
