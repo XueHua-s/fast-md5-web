@@ -45,6 +45,8 @@ description: "fast-md5-web 项目结构与模块地图。用于定位代码、�
   - `pnpm run test:unit`（Vitest）
   - `pnpm run test:e2e`（Playwright）
   - `pnpm run test:hook`（commit hook 专用入口）
+- 大文件基线：
+  - 单测与 e2e 的大文件场景按 `>=300MB` 维护，避免退化为小体积“伪大文件”验证。
 - 示例工程专项测试：
   - `pnpm --dir example/test-fast-md5 run test:e2e`
   - 首次运行时先执行 `pnpm --dir example/test-fast-md5 run test:e2e:install-browser`

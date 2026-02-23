@@ -29,7 +29,7 @@ test.describe('fast-md5-web npm package e2e', () => {
   }) => {
     await page.goto('/')
 
-    const fixtureNames = Object.keys(fixtureManifest.files)
+    const fixtureNames = ['empty.bin', 'small-text.txt', 'small-pattern.bin']
     const browserHashes = await page.evaluate(async names => {
       const sdk = window.__FAST_MD5_WEB__
       if (!sdk) {
@@ -58,7 +58,8 @@ test.describe('fast-md5-web npm package e2e', () => {
       return results
     }, fixtureNames)
 
-    for (const [fileName, expected] of Object.entries(fixtureManifest.files)) {
+    for (const fileName of fixtureNames) {
+      const expected = fixtureManifest.files[fileName]
       expect(browserHashes[fileName].md5_32).toBe(expected.md5_32)
       expect(browserHashes[fileName].md5_16).toBe(expected.md5_16)
     }
@@ -117,8 +118,8 @@ test.describe('fast-md5-web npm package e2e', () => {
         },
         1
       )
-      const batch = await pool.calculateMd5Batch(
-        [smallBytes, largeFile],
+      const largeBatch = await pool.calculateMd5Batch(
+        [largeFile, largeFile],
         32,
         120000,
         (completed, total) => {
@@ -132,7 +133,7 @@ test.describe('fast-md5-web npm package e2e', () => {
         sharedArrayBufferSupported,
         smallSingle,
         largeSingle,
-        batch,
+        largeBatch,
         progressHistory,
         batchProgress,
         status,
@@ -141,8 +142,8 @@ test.describe('fast-md5-web npm package e2e', () => {
 
     expect(poolResult.smallSingle).toBe(fixtureManifest.files['small-pattern.bin'].md5_32)
     expect(poolResult.largeSingle).toBe(fixtureManifest.files['large-pattern.bin'].md5_32)
-    expect(poolResult.batch).toEqual([
-      fixtureManifest.files['small-pattern.bin'].md5_32,
+    expect(poolResult.largeBatch).toEqual([
+      fixtureManifest.files['large-pattern.bin'].md5_32,
       fixtureManifest.files['large-pattern.bin'].md5_32,
     ])
 

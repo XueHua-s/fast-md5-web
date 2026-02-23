@@ -55,3 +55,4 @@
   - `pnpm run test`
 - commit hook 会强制执行：
   - `pnpm run test:hook`（Vitest + Playwright）
+- e2e 大文件 fixture 由脚本本地生成（>=300MB），避免将超大二进制提交到仓库。

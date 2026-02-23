@@ -67,6 +67,65 @@ function createPatternedBytes(length: number, seed: number): Uint8Array {
   return buffer
 }
 
+function createVirtualLargeFile(
+  size: number,
+  fillByte: number,
+  name: string
+): File {
+  const file = new File([], name, {
+    type: 'application/octet-stream',
+  })
+
+  Object.defineProperty(file, 'size', {
+    configurable: true,
+    value: size,
+  })
+
+  Object.defineProperty(file, 'slice', {
+    configurable: true,
+    value: (start: number = 0, end: number = size) => {
+      const normalizedEnd = Math.max(0, Math.min(end, size))
+      const normalizedStart = Math.max(0, Math.min(start, normalizedEnd))
+      const chunkLength = normalizedEnd - normalizedStart
+
+      return {
+        async arrayBuffer() {
+          const chunk = new Uint8Array(chunkLength)
+          chunk.fill(fillByte & 0xff)
+
+          return chunk.buffer
+        },
+      }
+    },
+  })
+
+  return file
+}
+
+function md5HexPatterned(
+  length: number,
+  fillByte: number,
+  md5Length: number = 32
+): string {
+  const hasher = createHash('md5')
+  const step = 2 * 1024 * 1024
+  const fullChunk = Buffer.alloc(step, fillByte & 0xff)
+  let remaining = length
+
+  while (remaining > 0) {
+    if (remaining >= step) {
+      hasher.update(fullChunk)
+      remaining -= step
+      continue
+    }
+
+    hasher.update(fullChunk.subarray(0, remaining))
+    remaining = 0
+  }
+
+  return hasher.digest('hex').slice(0, md5Length)
+}
+
 class MockWorker {
   static responseDelayMs = 0
 
@@ -293,26 +352,29 @@ describe('Md5CalculatorPool unit tests', () => {
   })
 
   it('uses shared-memory stream mode for large files and emits progress', async () => {
+    const largeSize = 300 * 1024 * 1024 + 257
+    const largeFillByte = 17
     const pool = createPool(
       2,
       {
         enabled: true,
-        memorySize: 64 * 1024 * 1024,
+        memorySize: 96 * 1024 * 1024,
         chunkSize: 2 * 1024 * 1024,
       },
       2
     )
-    const bytes = createPatternedBytes(9 * 1024 * 1024 + 257, 17)
-    const file = new File([bytes], 'large-pattern.bin', {
-      type: 'application/octet-stream',
-    })
+    const file = createVirtualLargeFile(
+      largeSize,
+      largeFillByte,
+      'large-pattern.bin'
+    )
     const progressHistory: number[] = []
 
     const hash = await pool.calculateMd5(file, 32, 30000, progress =>
       progressHistory.push(progress)
     )
 
-    expect(hash).toBe(md5Hex(bytes))
+    expect(hash).toBe(md5HexPatterned(largeSize, largeFillByte))
     expect(progressHistory.length).toBeGreaterThan(1)
     expect(progressHistory.at(-1)).toBe(100)
     expect(
@@ -325,6 +387,42 @@ describe('Md5CalculatorPool unit tests', () => {
     expect(status.sharedMemoryEnabled).toBe(true)
     expect(status.activeTasks).toBe(0)
     expect(status.pendingTasks).toBe(0)
+  })
+
+  it('supports batch hashing with multiple large files (>=300MB each)', async () => {
+    const largeSize = 300 * 1024 * 1024 + 257
+    const firstFillByte = 71
+    const secondFillByte = 91
+    const pool = createPool(
+      2,
+      {
+        enabled: true,
+        memorySize: 96 * 1024 * 1024,
+        chunkSize: 2 * 1024 * 1024,
+      },
+      2
+    )
+    const largeA = createVirtualLargeFile(largeSize, firstFillByte, 'large-a.bin')
+    const largeB = createVirtualLargeFile(largeSize, secondFillByte, 'large-b.bin')
+    const progressHistory: Array<{ completed: number; total: number }> = []
+
+    const result = await pool.calculateMd5Batch(
+      [largeA, largeB],
+      32,
+      120000,
+      (completed, total) => {
+        progressHistory.push({ completed, total })
+      }
+    )
+
+    expect(result).toEqual([
+      md5HexPatterned(largeSize, firstFillByte),
+      md5HexPatterned(largeSize, secondFillByte),
+    ])
+    expect(progressHistory.at(-1)).toEqual({
+      completed: 2,
+      total: 2,
+    })
   })
 
   it('returns ordered results for calculateMd5Batch and reports completion progress', async () => {

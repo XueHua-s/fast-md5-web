@@ -49,6 +49,8 @@
 - e2e fixture：
   - 生成脚本：`example/test-fast-md5/scripts/generate-fixtures.mjs`
   - 产物目录：`example/test-fast-md5/public/test-files/*`
+  - 大文件基线：`large-pattern.bin` 按 `>=300MB` 生成（当前约 300MiB+123B）
+  - 大文件为本地生成产物，不作为仓库版本文件提交
 
 ## 6) Git Hook 链路
 

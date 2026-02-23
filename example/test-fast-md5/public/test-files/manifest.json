@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/generate-fixtures.mjs",
-  "generatedAt": "deterministic-fixtures-v1",
+  "generatedAt": "deterministic-fixtures-v2-300mb",
   "files": {
     "empty.bin": {
       "description": "Empty file fixture for edge-case hashing",
@@ -21,10 +21,10 @@
       "md5_16": "3bbd784db536aa2f"
     },
     "large-pattern.bin": {
-      "description": "Deterministic binary fixture (>8MB stream threshold)",
-      "size": 12583035,
-      "md5_32": "542caf3704aea1ee1202e3b8d9fe480b",
-      "md5_16": "542caf3704aea1ee"
+      "description": "Deterministic binary fixture (>=300MB stream threshold, fixed-byte pattern)",
+      "size": 314572923,
+      "md5_32": "b0e8785d8a4b6e4c10da84e423d27f67",
+      "md5_16": "b0e8785d8a4b6e4c"
     }
   }
 }

@@ -1,7 +1,18 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+const FIXTURE_VERSION = 'deterministic-fixtures-v2-300mb'
+const LARGE_FILE_SIZE = 300 * 1024 * 1024 + 123
+const LARGE_FILE_FILL = 17
 
 function createPatternedBuffer(length, seed) {
   const output = Buffer.alloc(length)
@@ -19,9 +30,75 @@ function md5Hex(data) {
   return createHash('md5').update(data).digest('hex')
 }
 
+async function writeLargeFilledFile(filePath, size, fillByte) {
+  return new Promise((resolve, reject) => {
+    const stream = createWriteStream(filePath)
+    const hash = createHash('md5')
+    const fullChunk = Buffer.alloc(2 * 1024 * 1024, fillByte & 0xff)
+    let remaining = size
+
+    stream.on('error', reject)
+    stream.on('finish', () => resolve(hash.digest('hex')))
+
+    const writeNext = () => {
+      while (remaining > 0) {
+        const chunk =
+          remaining >= fullChunk.length
+            ? fullChunk
+            : fullChunk.subarray(0, remaining)
+
+        hash.update(chunk)
+        remaining -= chunk.length
+
+        if (!stream.write(chunk)) {
+          stream.once('drain', writeNext)
+          return
+        }
+      }
+
+      stream.end()
+    }
+
+    writeNext()
+  })
+}
+
+function isFixtureFresh(manifestPath, fixtureSpecs, fixtureDir) {
+  if (!existsSync(manifestPath)) {
+    return false
+  }
+
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (manifest.generatedAt !== FIXTURE_VERSION) {
+      return false
+    }
+
+    for (const fixture of fixtureSpecs) {
+      const filePath = resolve(fixtureDir, fixture.name)
+      if (!existsSync(filePath)) {
+        return false
+      }
+
+      if (statSync(filePath).size !== fixture.size) {
+        return false
+      }
+
+      if (!manifest.files?.[fixture.name]) {
+        return false
+      }
+    }
+  } catch {
+    return false
+  }
+
+  return true
+}
+
 const currentFile = fileURLToPath(import.meta.url)
 const projectDir = resolve(dirname(currentFile), '..')
 const fixtureDir = resolve(projectDir, 'public/test-files')
+const manifestPath = resolve(fixtureDir, 'manifest.json')
 
 mkdirSync(fixtureDir, { recursive: true })
 
@@ -29,7 +106,7 @@ const textFixture = Array.from({ length: 1024 }, (_, index) =>
   `fast-md5-web fixture line ${index.toString().padStart(4, '0')}`
 ).join('\n')
 
-const fixturePayloads = [
+const smallFixtures = [
   {
     name: 'empty.bin',
     description: 'Empty file fixture for edge-case hashing',
@@ -45,20 +122,31 @@ const fixturePayloads = [
     description: 'Deterministic binary fixture (256KB)',
     data: createPatternedBuffer(256 * 1024, 7),
   },
+]
+
+const fixtureSpecs = [
+  ...smallFixtures.map(item => ({
+    name: item.name,
+    size: item.data.length,
+  })),
   {
     name: 'large-pattern.bin',
-    description: 'Deterministic binary fixture (>8MB stream threshold)',
-    data: createPatternedBuffer(12 * 1024 * 1024 + 123, 17),
+    size: LARGE_FILE_SIZE,
   },
 ]
 
+if (isFixtureFresh(manifestPath, fixtureSpecs, fixtureDir)) {
+  console.log(`Fixtures already up to date in ${fixtureDir}`)
+  process.exit(0)
+}
+
 const manifest = {
   generatedBy: 'scripts/generate-fixtures.mjs',
-  generatedAt: 'deterministic-fixtures-v1',
+  generatedAt: FIXTURE_VERSION,
   files: {},
 }
 
-for (const fixture of fixturePayloads) {
+for (const fixture of smallFixtures) {
   const filePath = resolve(fixtureDir, fixture.name)
   writeFileSync(filePath, fixture.data)
 
@@ -71,9 +159,20 @@ for (const fixture of fixturePayloads) {
   }
 }
 
-writeFileSync(
-  resolve(fixtureDir, 'manifest.json'),
-  `${JSON.stringify(manifest, null, 2)}\n`
+const largeFilePath = resolve(fixtureDir, 'large-pattern.bin')
+const largeHash = await writeLargeFilledFile(
+  largeFilePath,
+  LARGE_FILE_SIZE,
+  LARGE_FILE_FILL
 )
 
-console.log(`Generated ${fixturePayloads.length} fixture files in ${fixtureDir}`)
+manifest.files['large-pattern.bin'] = {
+  description:
+    'Deterministic binary fixture (>=300MB stream threshold, fixed-byte pattern)',
+  size: LARGE_FILE_SIZE,
+  md5_32: largeHash,
+  md5_16: largeHash.slice(0, 16),
+}
+
+writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+console.log(`Generated ${fixtureSpecs.length} fixture files in ${fixtureDir}`)

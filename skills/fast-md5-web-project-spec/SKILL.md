@@ -43,6 +43,8 @@ description: "fast-md5-web 全局架构与改造规范。用于跨 `src/*`、`wa
   - `pnpm run test:unit`（仅 Vitest 单元测试）
   - `pnpm run test:e2e`（仅 Playwright e2e）
   - `pnpm run test:hook`（commit hook 使用的统一测试入口）
+- 大文件测试基线：
+  - 大文件场景最小体积使用 `>=300MB`，覆盖单文件与多大文件批量路径。
 - 首次在新环境运行 e2e 时：
   - `pnpm --dir example/test-fast-md5 run test:e2e:install-browser`
 - 仅验证示例工程时：
