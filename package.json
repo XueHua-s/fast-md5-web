@@ -14,6 +14,11 @@
     "build": "pnpm run build:wasm && tsup",
     "dev": "tsup --watch",
     "clean": "rimraf dist",
+    "postinstall": "node ./scripts/postinstall.mjs",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:e2e": "pnpm --dir example/test-fast-md5 test:e2e",
+    "test:hook": "pnpm run test:unit && pnpm run test:e2e",
+    "test": "pnpm run test:unit && pnpm run test:e2e",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
@@ -51,11 +56,13 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.4",
     "husky": "9.1.7",
+    "lint-staged": "15.5.2",
     "oxlint": "1.14.0",
     "prettier": "3.6.2",
     "rimraf": "5.0.0",
     "tsup": "8.0.0",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "2.1.8"
   },
   "files": [
     "dist",

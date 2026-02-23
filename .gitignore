@@ -90,6 +90,10 @@ jspm_packages/
 # Gatsby files
 .cache/
 public
+!example/test-fast-md5/public/
+!example/test-fast-md5/public/test-files/
+!example/test-fast-md5/public/test-files/**
+example/test-fast-md5/public/test-files/large-pattern.bin
 
 # Storybook build outputs
 .out

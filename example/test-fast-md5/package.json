@@ -12,17 +12,25 @@
     "onlyAllow": "pnpm"
   },
   "scripts": {
+    "prepare:fast-md5-web": "pnpm --dir ../.. exec tsup",
+    "predev": "pnpm run prepare:fast-md5-web",
     "dev": "vite --host",
+    "prebuild": "pnpm run prepare:fast-md5-web",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "fixtures:generate": "node ./scripts/generate-fixtures.mjs",
+    "pretest:e2e": "pnpm run prepare:fast-md5-web && pnpm run fixtures:generate",
+    "test:e2e": "playwright test",
+    "test:e2e:install-browser": "playwright install chromium"
   },
   "dependencies": {
-    "fast-md5-web": "1.1.1",
+    "fast-md5-web": "link:../..",
     "js-md5": "0.8.3",
     "spark-md5": "3.0.2",
     "vue": "3.5.18"
   },
   "devDependencies": {
+    "@playwright/test": "1.50.1",
     "@types/spark-md5": "3.0.5",
     "@vitejs/plugin-vue": "5.2.4",
     "@vue/tsconfig": "0.7.0",

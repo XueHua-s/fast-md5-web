@@ -1,2 +1,3 @@
-npm run type-check
-npx lint-staged
+pnpm exec lint-staged
+pnpm run type-check
+pnpm run test:hook
