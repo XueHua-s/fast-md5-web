@@ -2,12 +2,20 @@ import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkerMessage, WorkerMessageData } from '../src/types'
 
-// Polyfill navigator for Node.js test environment
+// Polyfill browser globals for Node.js test environment (Node 18 CI)
 if (typeof navigator === 'undefined') {
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     writable: true,
     value: { hardwareConcurrency: 8 },
+  })
+}
+if (typeof File === 'undefined') {
+  const { File: NodeFile } = await import('node:buffer')
+  Object.defineProperty(globalThis, 'File', {
+    configurable: true,
+    writable: true,
+    value: NodeFile,
   })
 }
 
