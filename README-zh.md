@@ -16,9 +16,13 @@
 - ⚡ **高性能** - 单线程模式比 spark-md5 快 8 倍，多线程 Worker 模式快 16 倍
 - 📦 **纯 ESM** - 支持浏览器、Node.js 和 Deno 的现代 ES 模块（不支持 CommonJS）
 - 📝 **TypeScript 支持** - 完整的 TypeScript 声明和类型安全
-- 🔄 **异步处理** - 大文件分块处理，支持控制权让出
+- 🔄 **流式处理** - 增量 MD5 计算，处理大文件（200MB+）不会内存溢出
 - 🎯 **灵活输出** - 支持 16 位和 32 位 MD5 哈希长度
 - 🔄 **自动回退** - SharedArrayBuffer 不可用时自动回退到消息传递模式
+- 🧠 **智能内存管理** - 智能共享内存分配与碎片控制
+- 📊 **进度追踪** - 大文件处理的实时进度更新
+- 🎛️ **并发控制** - 可配置最大并发任务数，防止系统过载
+- 📦 **批量处理** - 优化的批量处理，带优先级队列和任务管理
 
 ## 📦 安装
 
@@ -146,13 +150,16 @@ class Md5CalculatorPool {
     onProgress?: (completed: number, total: number) => void
   ): Promise<string[]>;
   
-  destroy(): void;
+  // 任务管理
+  cancelTask(taskId: string): boolean;
+
+  // 池状态与清理
   getPoolStatus(): {
     totalWorkers: number;         // 总工作线程数
     availableWorkers: number;     // 可用工作线程数
     pendingTasks: number;         // 待处理任务数
     activeTasks: number;          // 活跃任务数
-    maxConcurrentTasks: number;   // 最大并发任务数（默认等于线程数）
+    maxConcurrentTasks: number;   // 最大并发任务数
     sharedMemoryEnabled: boolean; // 共享内存是否启用
     sharedMemoryUsage?: {         // 共享内存使用情况
       total: number;              // 总内存大小
@@ -161,13 +168,7 @@ class Md5CalculatorPool {
       fragmentation: number;      // 内存碎片数量
     };
   };
-  
-  // 动态共享内存控制
-  enableSharedMemory(memorySize?: number, chunkSize?: number): boolean;
-  disableSharedMemory(): void;
-  
-  // 任务管理
-  cancelTask(taskId: string): boolean;
+  destroy(): void;
 }
 ```
 
@@ -245,18 +246,22 @@ await pool.calculateMd5(file, 32, 0);
 
 ```
 ├── src/
-│   ├── index.ts          # 主要 TypeScript 入口
-│   └── md5-worker.ts     # Web Worker 实现
-├── wasm/                 # Rust WASM 源码
+│   ├── index.ts                  # 主入口（Md5CalculatorPool）
+│   ├── md5-worker.ts             # Web Worker 实现
+│   ├── types.ts                  # 共享类型定义
+│   └── shared-memory-allocator.ts # SharedArrayBuffer 内存分配器
+├── wasm/                         # Rust WASM 源码
 │   ├── src/
-│   │   ├── lib.rs        # 主要 Rust 库
-│   │   └── utils.rs      # 工具函数
-│   ├── Cargo.toml        # Rust 依赖配置
-│   └── pkg/              # 生成的 WASM 包
-├── dist/                 # 构建输出
+│   │   ├── lib.rs                # 主要 Rust 库
+│   │   └── utils.rs              # 工具函数
+│   ├── Cargo.toml                # Rust 依赖配置
+│   └── pkg/                      # 生成的 WASM 包
+├── __test/                       # 单元测试
+├── example/test-fast-md5/        # E2E 测试应用（vitest + playwright）
+├── dist/                         # 构建输出
 ├── package.json
-├── tsup.config.ts        # 构建配置
-└── tsconfig.json         # TypeScript 配置
+├── tsup.config.ts                # 构建配置
+└── tsconfig.json                 # TypeScript 配置
 ```
 
 ## ⚡ 性能特点

@@ -54,12 +54,13 @@ import { Md5CalculatorPool, WasmInit, Md5Calculator } from 'fast-md5-web';
 // Method 1: Using Worker Pool with SharedArrayBuffer (Recommended for processing multiple files)
 const pool = new Md5CalculatorPool(
   navigator.hardwareConcurrency, // Worker count
-  undefined, // SharedMemoryConfig (optional)
+  {
+    enabled: true,                    // Enable SharedArrayBuffer
+    memorySize: 64 * 1024 * 1024,    // 64MB shared memory
+    chunkSize: 2 * 1024 * 1024       // 2MB chunks
+  },
   3 // Max concurrent tasks
 );
-
-// Enable shared memory for large files
-pool.enableSharedMemory(64 * 1024 * 1024, 2 * 1024 * 1024); // 64MB memory, 2MB chunks
 
 // Process large files with progress tracking
 const largeFile = new File([/* large data */], 'large-file.bin');
@@ -184,10 +185,6 @@ class Md5CalculatorPool {
     onProgress?: (completed: number, total: number) => void
   ): Promise<string[]>;
   
-  // Shared memory management
-  enableSharedMemory(memorySize?: number, chunkSize?: number): boolean;
-  disableSharedMemory(): void;
-  
   // Task management
   cancelTask(taskId: string): boolean;
   
@@ -271,18 +268,22 @@ await pool.calculateMd5(file, 32, 0);
 
 ```
 ├── src/
-│   ├── index.ts          # Main TypeScript entry
-│   └── md5-worker.ts     # Web Worker implementation
-├── wasm/                 # Rust WASM source
+│   ├── index.ts                  # Main entry (Md5CalculatorPool)
+│   ├── md5-worker.ts             # Web Worker implementation
+│   ├── types.ts                  # Shared type definitions
+│   └── shared-memory-allocator.ts # SharedArrayBuffer allocator
+├── wasm/                         # Rust WASM source
 │   ├── src/
-│   │   ├── lib.rs        # Main Rust library
-│   │   └── utils.rs      # Utility functions
-│   ├── Cargo.toml        # Rust dependencies
-│   └── pkg/              # Generated WASM package
-├── dist/                 # Build output
+│   │   ├── lib.rs                # Main Rust library
+│   │   └── utils.rs              # Utility functions
+│   ├── Cargo.toml                # Rust dependencies
+│   └── pkg/                      # Generated WASM package
+├── __test/                       # Unit tests
+├── example/test-fast-md5/        # E2E test app (vitest + playwright)
+├── dist/                         # Build output
 ├── package.json
-├── tsup.config.ts        # Build configuration
-└── tsconfig.json         # TypeScript configuration
+├── tsup.config.ts                # Build configuration
+└── tsconfig.json                 # TypeScript configuration
 ```
 
 ## ⚡ Performance
@@ -323,8 +324,11 @@ await pool.calculateMd5(file, 32, 0);
 
 #### For Large Files (>50MB)
 ```typescript
-// Enable shared memory with appropriate chunk size
-pool.enableSharedMemory(128 * 1024 * 1024, 4 * 1024 * 1024); // 128MB, 4MB chunks
+// Create pool with shared memory configured
+const pool = new Md5CalculatorPool(
+  navigator.hardwareConcurrency,
+  { enabled: true, memorySize: 128 * 1024 * 1024, chunkSize: 4 * 1024 * 1024 }
+);
 
 // Use high priority for critical files
 const hash = await pool.calculateMd5(
@@ -432,14 +436,15 @@ When SharedArrayBuffer is unavailable:
 **Solutions**:
 ```typescript
 // Reduce chunk size for memory-constrained environments
-pool.enableSharedMemory(32 * 1024 * 1024, 1 * 1024 * 1024); // 32MB, 1MB chunks
-
-// Reduce concurrent tasks
-const pool = new Md5CalculatorPool(2, 1); // 2 workers, 1 concurrent task
+const pool = new Md5CalculatorPool(
+  2, // 2 workers
+  { enabled: true, memorySize: 32 * 1024 * 1024, chunkSize: 1 * 1024 * 1024 },
+  1  // 1 concurrent task
+);
 
 // Monitor memory usage
 const status = pool.getPoolStatus();
-if (status.memoryUsed > 100 * 1024 * 1024) { // > 100MB
+if (status.sharedMemoryUsage && status.sharedMemoryUsage.used > 100 * 1024 * 1024) {
   console.warn('High memory usage detected');
 }
 ```
