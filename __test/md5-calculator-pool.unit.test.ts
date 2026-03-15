@@ -2,15 +2,6 @@ import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkerMessage, WorkerMessageData } from '../src/types'
 
-// Polyfill navigator for Node.js test environment
-if (typeof navigator === 'undefined') {
-  Object.defineProperty(globalThis, 'navigator', {
-    configurable: true,
-    writable: true,
-    value: { hardwareConcurrency: 8 },
-  })
-}
-
 let uuidCounter = 0
 
 vi.mock('uuid', () => ({
