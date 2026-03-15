@@ -67,7 +67,8 @@
   "files": [
     "dist",
     "wasm/pkg/**/*",
-    "package.json"
+    "package.json",
+    "README.md"
   ],
   "exports": {
     ".": {
