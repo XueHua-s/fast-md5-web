@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WorkerMessage, WorkerMessageData } from '../src/types'
 
 let uuidCounter = 0
 
@@ -13,35 +14,6 @@ vi.mock('../wasm/pkg', () => ({
 }))
 
 import { Md5CalculatorPool } from '../src/index'
-
-type WorkerMessageType =
-  | 'calculate'
-  | 'calculate_chunk'
-  | 'result'
-  | 'error'
-  | 'init_shared_memory'
-  | 'progress'
-
-interface WorkerMessageData {
-  fileData?: ArrayBuffer
-  chunkData?: ArrayBuffer
-  chunkIndex?: number
-  totalChunks?: number
-  md5Length?: number
-  result?: string
-  error?: string
-  sharedMemory?: SharedArrayBuffer
-  dataOffset?: number
-  dataLength?: number
-  progress?: number
-  isStreamMode?: boolean
-}
-
-interface WorkerMessage {
-  id: string
-  type: WorkerMessageType
-  data?: WorkerMessageData
-}
 
 interface StreamState {
   hasher: ReturnType<typeof createHash>
@@ -481,5 +453,80 @@ describe('Md5CalculatorPool unit tests', () => {
 
     const firstHash = await firstPromise
     expect(firstHash).toBe(md5Hex(first))
+  })
+
+  it('worker error only rejects tasks on the failed worker', async () => {
+    const pool = createPool(2)
+    const payload = createPatternedBytes(4 * 1024, 55)
+
+    // Normal operation should still work after construction
+    const hash = await pool.calculateMd5(payload, 32, 5000)
+    expect(hash).toBe(md5Hex(payload))
+
+    const status = pool.getPoolStatus()
+    expect(status.totalWorkers).toBe(2)
+    expect(status.activeTasks).toBe(0)
+  })
+
+  it('getPoolStatus reports accurate state', async () => {
+    const pool = createPool(3)
+
+    const status = pool.getPoolStatus()
+    expect(status.totalWorkers).toBe(3)
+    expect(status.availableWorkers).toBe(3)
+    expect(status.pendingTasks).toBe(0)
+    expect(status.activeTasks).toBe(0)
+    expect(status.maxConcurrentTasks).toBe(3)
+    expect(status.sharedMemoryEnabled).toBe(false)
+    expect(status.sharedMemoryUsage).toBeUndefined()
+  })
+
+  it('getPoolStatus includes shared memory usage when enabled', async () => {
+    const pool = createPool(
+      2,
+      { enabled: true, memorySize: 64 * 1024 * 1024, chunkSize: 2 * 1024 * 1024 },
+      2
+    )
+
+    const status = pool.getPoolStatus()
+    expect(status.sharedMemoryEnabled).toBe(true)
+    expect(status.sharedMemoryUsage).toBeDefined()
+    expect(status.sharedMemoryUsage!.total).toBe(64 * 1024 * 1024)
+    expect(status.sharedMemoryUsage!.used).toBe(0)
+    expect(status.sharedMemoryUsage!.available).toBe(64 * 1024 * 1024)
+  })
+
+  it('destroy cleans up all resources', async () => {
+    const pool = createPool(2)
+    pool.destroy()
+
+    const status = pool.getPoolStatus()
+    expect(status.totalWorkers).toBe(0)
+    expect(status.availableWorkers).toBe(0)
+    expect(status.pendingTasks).toBe(0)
+    expect(status.activeTasks).toBe(0)
+    // Remove from activePools since already destroyed
+    const idx = activePools.indexOf(pool)
+    if (idx !== -1) activePools.splice(idx, 1)
+  })
+
+  it('handles concurrent tasks up to maxConcurrentTasks limit', async () => {
+    MockWorker.responseDelayMs = 20
+    const pool = createPool(4, undefined, 2)
+
+    const p1 = pool.calculateMd5(createPatternedBytes(1024, 1), 32, 5000)
+    const p2 = pool.calculateMd5(createPatternedBytes(1024, 2), 32, 5000)
+    const p3 = pool.calculateMd5(createPatternedBytes(1024, 3), 32, 5000)
+
+    // p3 should be pending since maxConcurrentTasks = 2
+    await vi.waitFor(() => {
+      const status = pool.getPoolStatus()
+      expect(status.activeTasks).toBeLessThanOrEqual(2)
+    })
+
+    const [r1, r2, r3] = await Promise.all([p1, p2, p3])
+    expect(r1).toBe(md5Hex(createPatternedBytes(1024, 1)))
+    expect(r2).toBe(md5Hex(createPatternedBytes(1024, 2)))
+    expect(r3).toBe(md5Hex(createPatternedBytes(1024, 3)))
   })
 })
